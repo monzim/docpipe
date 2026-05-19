@@ -9,6 +9,12 @@ on:
 permissions:
   contents: read
 
+# Opt the runner's JS actions into Node 24 early.
+# GitHub forces this default on 2026-06-02; setting it now silences the
+# deprecation warnings and avoids a surprise on cutover day.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
 jobs:
   test:
     name: Build and test

@@ -1,0 +1,40 @@
+# Dependabot keeps GitHub Actions versions current so we don't have to chase
+# Node 20→24-style deprecations by hand again.
+#
+# Weekly cadence is the right balance — daily PRs become noise; monthly
+# misses security advisories.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # Roll all action bumps into one PR per week so CI runs against the
+      # full set, not 5 separate flake-prone runs.
+      actions:
+        patterns: ["*"]
+
+  - package-ecosystem: gomod
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 5
+    groups:
+      # chromedp + cdproto move together; group so they upgrade as a unit.
+      chromedp:
+        patterns:
+          - "github.com/chromedp/*"
+      # Everything else clustered too — fewer PRs to merge.
+      minor-and-patch:
+        update-types: [minor, patch]
+
+  - package-ecosystem: docker
+    directory: /deploy
+    schedule:
+      interval: weekly
+      day: monday
+    open-pull-requests-limit: 3

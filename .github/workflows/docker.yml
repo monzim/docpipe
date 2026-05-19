@@ -14,6 +14,10 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
+  # Opt the runner's JS actions into Node 24 early.
+  # GitHub forces this default on 2026-06-02; setting it now silences the
+  # deprecation warnings and avoids a surprise on cutover day.
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions:
   contents: read
