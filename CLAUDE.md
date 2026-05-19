@@ -47,9 +47,22 @@ These shape every design decision in the codebase. Don't relitigate them without
 - **Non-Latin scripts** (Bangla, CJK, emoji) require the Noto font packages. The Dockerfile installs `fonts-noto fonts-noto-cjk fonts-noto-color-emoji fonts-noto-extra`. Verify with the fixtures in `testdata/`.
 - **`--disable-dev-shm-usage`** is mandatory for containerized Chromium — `/dev/shm` is tiny in containers. Other required flags listed in `internal/render/browser.go` and mirrored in `deploy/chrome-flags.txt`.
 
+## API contract (v2)
+
+`POST /v1/convert/html-to-pdf` requires `html_base64` — a base64-encoded HTML string. **Raw HTML is not accepted.** The `html` field was dropped in the second v2 iteration because inline CSS quotes/newlines/backslashes break naive JSON callers; base64 eliminates the encoding ambiguity entirely. If you add another input format, mirror the lesson — pick one unambiguous wire format per field.
+
+## API key lifecycle
+
+Keys come from one of two sources, in order:
+
+1. **`DOCPIPE_API_KEYS` env var** (explicit). When set, this is authoritative and the persisted file is ignored entirely. Use this for multi-host / auto-scaled deployments where every instance needs to honor the same key set regardless of volume state.
+2. **`${DOCPIPE_DATA_DIR}/api-keys.json`** (auto-generated, persisted). When the env is unset, the service generates `AutoGenCount` (10) keys on first startup, writes them to disk at `chmod 0600`, and reuses them on every subsequent restart. A first-run banner prints the secrets to stderr exactly once so an operator can grab them. The persisted file is the only place plaintext secrets live; `auth.Store` only ever holds SHA-256 hashes.
+
+Implementation: `internal/auth/persist.go` (`LoadOrGenerate`). Wired in `cmd/docpipe/main.go` before any handler is constructed. If the persisted file is corrupt, the service archives it as `api-keys.json.broken.<ts>` and regenerates — keys reset, but the service stays up.
+
 ## v1 compat shim
 
-`POST /api/html-to-pdf` is preserved for the CASCK job portal (`apply.casckjobs.org`). It accepts the v1 `{"base64_html": "..."}` payload and returns a PDF named `admit_card.pdf`. Every call:
+`POST /api/html-to-pdf` is preserved for the CASCK job portal (`apply.casckjobs.org`). It accepts the v1 `{"base64_html": "..."}` payload (note the field-name difference vs v2's `html_base64`) and returns a PDF named `admit_card.pdf`. Every call:
 
 - Emits a `WARN` log (`legacy_endpoint_used`) with the key name and remote address.
 - Sets `Deprecation: true`, `Sunset`, and `Link: rel="successor-version"` response headers.

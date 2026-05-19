@@ -49,14 +49,15 @@ paths:
               a4-portrait:
                 summary: A4 portrait, default options
                 value:
-                  html: "<!doctype html><html><body><h1>Hello</h1></body></html>"
+                  # base64 of: <!doctype html><html><body><h1>Hello</h1></body></html>
+                  html_base64: "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGJvZHk+PGgxPkhlbGxvPC9oMT48L2JvZHk+PC9odG1sPg=="
                   filename: hello.pdf
                   options:
                     format: A4
               letter-landscape:
                 summary: US Letter landscape with custom margins
                 value:
-                  html: "<!doctype html><html><body><h1>Report</h1></body></html>"
+                  html_base64: "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGJvZHk+PGgxPlJlcG9ydDwvaDE+PC9ib2R5PjwvaHRtbD4="
                   filename: report.pdf
                   options:
                     format: Letter
@@ -66,8 +67,8 @@ paths:
                       bottom: 12mm
                       left: 10mm
                       right: 10mm
-              base64-input-and-output:
-                summary: Send base64-encoded HTML, request JSON-wrapped PDF
+              json-response:
+                summary: Send Accept application/json to get a base64-wrapped PDF response
                 value:
                   html_base64: "PCFkb2N0eXBlIGh0bWw+PGgxPmhpPC9oMT4="
                   filename: hi.pdf
@@ -264,22 +265,21 @@ components:
   schemas:
     ConvertRequest:
       type: object
+      required: [html_base64]
       properties:
-        html:
-          type: string
-          description: Raw HTML. Mutually exclusive with html_base64.
         html_base64:
           type: string
-          description: Base64-encoded HTML. Mutually exclusive with html.
+          description: |
+            Base64-encoded HTML. Raw HTML is not accepted because newlines,
+            quotes, and backslashes in inline CSS frequently break naive JSON
+            encoders — base64 is one unambiguous wire format.
+          example: "PCFkb2N0eXBlIGh0bWw+PGgxPmhpPC9oMT4="
         filename:
           type: string
           description: Filename used in Content-Disposition.
           default: document.pdf
         options:
           $ref: '#/components/schemas/PDFOptions'
-      oneOf:
-        - required: [html]
-        - required: [html_base64]
     PDFOptions:
       type: object
       properties:

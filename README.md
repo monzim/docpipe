@@ -2,8 +2,9 @@
 
 HTML → PDF rendering service in Go, backed by a long-lived headless Chromium pool.
 
-- Synchronous request/response (POST HTML → receive PDF)
+- Synchronous request/response (POST base64-encoded HTML → receive PDF)
 - API-key authentication with per-key rate limiting
+- **Zero-config API keys** — auto-generated and persisted across restarts if you don't supply them
 - Built-in public analytics with persistence: `/v1/stats` + dashboard
 - Single binary, no external services — config + analytics in env vars and local files
 - OpenAPI 3.1 spec + Swagger UI (dev mode)
@@ -11,24 +12,112 @@ HTML → PDF rendering service in Go, backed by a long-lived headless Chromium p
 
 The full architectural spec lives in [`project-specification.md`](./project-specification.md).
 
+---
+
 ## Quick start
 
 ```bash
-# Generate API keys
-./scripts/gen-apikey.sh portal internal
-
-# Copy .env.example to .env and paste the DOCPIPE_API_KEYS line
-cp .env.example .env
-
-# Run via docker compose
-docker compose -f deploy/docker-compose.yml up --build
-
-# Or build the image manually
-make docker
-docker run -d -p 8080:8080 -e DOCPIPE_API_KEYS=portal:ak_live_... docpipe:latest
+# Zero-config: image generates 10 API keys on first launch and saves them
+docker run -d --name docpipe \
+  -p 8080:8080 \
+  -v docpipe-data:/app/data \
+  -e DOCPIPE_ENABLE_SWAGGER=true \
+  ghcr.io/monzim/docpipe:latest
 ```
 
-The service listens on `:8080`.
+That's it. The service is now live on `:8080`. On the **next** step you'll fetch the auto-generated keys.
+
+### Or supply your own keys
+
+```bash
+./scripts/gen-apikey.sh portal internal   # prints a paste-ready DOCPIPE_API_KEYS line
+
+docker run -d --name docpipe -p 8080:8080 \
+  -v docpipe-data:/app/data \
+  -e DOCPIPE_API_KEYS="portal:ak_live_...,internal:ak_live_..." \
+  ghcr.io/monzim/docpipe:latest
+```
+
+When `DOCPIPE_API_KEYS` is set, the service uses *only* those keys and ignores any persisted file. This is the recommended mode for multi-host deployments — same env, same keys, regardless of which container restarts.
+
+---
+
+## Retrieving the auto-generated API keys
+
+If you didn't set `DOCPIPE_API_KEYS`, DocPipe generated 10 keys (`key-01` through `key-10`) on first start and saved them to `/app/data/api-keys.json` inside the container. **Pick whichever method is easier:**
+
+### 1. From the container logs (only printed once, at first generation)
+
+```bash
+docker logs docpipe 2>&1 | sed -n '/auto-generated API keys/,/Set DOCPIPE_API_KEYS/p'
+```
+
+The first-run banner looks like this:
+
+```
+═══════════════════════════════════════════════════════════════════════
+ DocPipe auto-generated API keys (saved to /app/data/api-keys.json)
+═══════════════════════════════════════════════════════════════════════
+  key-01      ak_live_a1b2c3...
+  key-02      ak_live_d4e5f6...
+  ...
+═══════════════════════════════════════════════════════════════════════
+ To use: Authorization: Bearer <secret>   or   X-API-Key: <secret>
+ Set DOCPIPE_API_KEYS env to override; these are persisted otherwise.
+═══════════════════════════════════════════════════════════════════════
+```
+
+This banner is only printed when keys are *freshly generated* — not on subsequent restarts.
+
+### 2. From the persisted file (always available)
+
+```bash
+# Read the keys JSON straight out of the docker volume
+docker exec docpipe cat /app/data/api-keys.json
+```
+
+Or, if the container is stopped:
+
+```bash
+docker run --rm -v docpipe-data:/data alpine cat /data/api-keys.json
+```
+
+The file shape:
+
+```json
+{
+  "generated_at": "2026-05-20T08:14:33Z",
+  "keys": {
+    "key-01": "ak_live_a1b2c3...",
+    "key-02": "ak_live_d4e5f6...",
+    ...
+  }
+}
+```
+
+It's `chmod 0600` (owner-only readable) on disk, since secrets are stored in plaintext so you can recover them.
+
+### 3. Quick one-liner for the first key
+
+```bash
+docker exec docpipe sh -c "cat /app/data/api-keys.json" | jq -r '.keys["key-01"]'
+```
+
+### Replacing the auto-generated keys
+
+To switch over to your own keys, just stop, set `DOCPIPE_API_KEYS`, and restart:
+
+```bash
+docker rm -f docpipe
+docker run -d --name docpipe -p 8080:8080 \
+  -v docpipe-data:/app/data \
+  -e DOCPIPE_API_KEYS="portal:ak_live_yourkey" \
+  ghcr.io/monzim/docpipe:latest
+```
+
+The persisted `api-keys.json` is left on disk but ignored. The next time you launch without the env var, those persisted keys come back.
+
+---
 
 ## Endpoints
 
@@ -47,42 +136,53 @@ The service listens on `:8080`.
 
 ### Convert example
 
+HTML must be **base64-encoded** in the request body. Raw HTML inside JSON is fragile — every quote, newline, or backslash in a `<style>` block can break naive callers. One unambiguous encoding eliminates a whole class of bugs.
+
 ```bash
+KEY=ak_live_yourkey
+HTML='<!doctype html><html><body><h1>Hello</h1></body></html>'
+BODY=$(printf '%s' "$HTML" | base64 -w0)
+
 curl -X POST http://localhost:8080/v1/convert/html-to-pdf \
-  -H "Authorization: Bearer ak_live_..." \
+  -H "Authorization: Bearer $KEY" \
   -H "Content-Type: application/json" \
-  -d '{
-    "html": "<!doctype html><html><body><h1>Hello</h1></body></html>",
-    "filename": "hello.pdf",
-    "options": {
-      "format": "A4",
-      "margin": {"top":"10mm","bottom":"10mm","left":"10mm","right":"10mm"},
-      "wait": {"strategy":"networkidle","timeout_ms":5000}
+  -d "{
+    \"html_base64\": \"$BODY\",
+    \"filename\": \"hello.pdf\",
+    \"options\": {
+      \"format\": \"A4\",
+      \"margin\": {\"top\":\"10mm\",\"bottom\":\"10mm\",\"left\":\"10mm\",\"right\":\"10mm\"},
+      \"wait\": {\"strategy\":\"networkidle\",\"timeout_ms\":5000}
     }
-  }' --output hello.pdf
+  }" --output hello.pdf
 ```
 
-Request `application/json` instead of the raw PDF:
+To receive a JSON envelope with the base64-encoded PDF instead of raw bytes:
 
 ```bash
 curl ... -H "Accept: application/json" -o response.json
-# { "filename":"hello.pdf", "size_bytes":..., "pdf_base64":"...", "duration_ms":..., "request_id":"..." }
+# {"filename":"hello.pdf","size_bytes":...,"pdf_base64":"...","duration_ms":...,"request_id":"..."}
 ```
+
+---
 
 ## Configuration
 
-All settings come from environment variables — see [`.env.example`](./.env.example) for the full list with defaults. The handful that matter most:
+All settings come from environment variables — see [`.env.example`](./.env.example) for the full list with defaults.
 
 | Variable | Default | Notes |
 |---|---|---|
-| `DOCPIPE_API_KEYS` | *(required)* | Comma-separated `name:secret` |
+| `DOCPIPE_API_KEYS` | *(optional — auto-gen if unset)* | Comma-separated `name:secret` |
 | `DOCPIPE_RENDER_CONCURRENCY` | `runtime.NumCPU()` | Cap on simultaneous renders |
 | `DOCPIPE_RENDER_TIMEOUT` | `30s` | Per-request render budget |
 | `DOCPIPE_RATE_LIMIT_RPS` | `5` | Per-key token bucket |
 | `DOCPIPE_BROWSER_RECYCLE_AFTER` | `500` | Renders before Chrome restart |
-| `DOCPIPE_DATA_DIR` | `./data` | Analytics snapshot directory |
-| `DOCPIPE_SNAPSHOT_INTERVAL` | `1h` | Persistence cadence |
+| `DOCPIPE_DATA_DIR` | `./data` | Analytics + api-keys.json directory |
+| `DOCPIPE_SNAPSHOT_INTERVAL` | `1h` | Analytics persistence cadence |
 | `DOCPIPE_STATS_PUBLIC` | `true` | Toggle public stats |
+| `DOCPIPE_ENABLE_SWAGGER` | `false` | Force-enable Swagger UI in production |
+
+---
 
 ## Development
 
@@ -97,8 +197,6 @@ make soak          # 1000-seq + parallel waves, asserts no zombies (uses Docker)
 make openapi-validate   # spectral lint (if installed)
 ```
 
-The renderer integration tests are gated behind `-tags=integration` and require a local Chromium-class binary. Production-style soak runs via Docker.
-
 ### Project layout
 
 ```
@@ -109,7 +207,7 @@ internal/
   httpx/             chi router, middleware, error envelope
   render/            chromedp browser pool + PDF action
   analytics/         counters, histogram, RPS, persistence, public view
-  auth/              API key store + rate limiter
+  auth/              API key store, persistence (api-keys.json), rate limiter
   handlers/          HTTP handlers (convert, legacy, stats, dashboard, swagger)
   webassets/         go:embed for dashboard.html + openapi.yaml
 deploy/              Dockerfile, docker-compose, chrome-flags reference
@@ -133,7 +231,7 @@ Asserts at the end of every run:
 
 ## v1 → v2 migration
 
-The legacy `/api/html-to-pdf` accepts the original `{"base64_html": "..."}` payload and returns a PDF named `admit_card.pdf` for the CASCK job portal. Every call emits a `WARN` log with the key name, plus `Deprecation: true` and `Sunset` response headers. Migrate to `/v1/convert/html-to-pdf` and the path will be removed.
+The legacy `/api/html-to-pdf` accepts the original `{"base64_html": "..."}` payload (note the field name swap vs v2's `html_base64`) and returns a PDF named `admit_card.pdf` for the CASCK job portal. Every call emits a `WARN` log with the key name, plus `Deprecation: true` and `Sunset` response headers. Migrate to `/v1/convert/html-to-pdf` and the path will be removed.
 
 ## Spec
 

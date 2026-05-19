@@ -17,6 +17,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"sort"
 	"syscall"
 	"time"
 
@@ -30,6 +31,18 @@ import (
 	"github.com/monzim/docpipe/internal/observability"
 	"github.com/monzim/docpipe/internal/render"
 )
+
+// sortedKeyNames returns key names alphabetically — used purely for stable
+// startup output. The keys map iteration order isn't deterministic and a
+// shuffling list of keys at boot would be confusing.
+func sortedKeyNames(keys map[string]string) []string {
+	out := make([]string, 0, len(keys))
+	for k := range keys {
+		out = append(out, k)
+	}
+	sort.Strings(out)
+	return out
+}
 
 // Set via -ldflags "-X main.version=... -X main.commit=... -X main.buildDate=...".
 var (
@@ -59,8 +72,32 @@ func run() error {
 		slog.String("build_date", buildDate),
 		slog.String("env", cfg.Env),
 		slog.Int("render_concurrency", cfg.RenderConcurrency),
-		slog.Int("api_keys_loaded", len(cfg.APIKeys)),
 	)
+
+	// Resolve API keys before anything else — auto-generate + persist if the
+	// user hasn't set DOCPIPE_API_KEYS, so the service is usable on a fresh
+	// volume with zero config. The persisted file is read on next restart.
+	apiKeys, freshlyGenerated, err := auth.LoadOrGenerate(cfg.DataDir, cfg.APIKeys, log)
+	if err != nil {
+		return fmt.Errorf("api key resolution: %w", err)
+	}
+	if freshlyGenerated {
+		// One-time prominent printout so the operator can copy the secrets
+		// before they roll out of the log buffer. Printed to stderr (not slog)
+		// to skip the structured-log formatter — easier to grep with `docker logs`.
+		fmt.Fprintln(os.Stderr, "")
+		fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════")
+		fmt.Fprintln(os.Stderr, " DocPipe auto-generated API keys (saved to "+cfg.DataDir+"/api-keys.json)")
+		fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════")
+		for _, name := range sortedKeyNames(apiKeys) {
+			fmt.Fprintf(os.Stderr, "  %-10s  %s\n", name, apiKeys[name])
+		}
+		fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════")
+		fmt.Fprintln(os.Stderr, " To use: Authorization: Bearer <secret>   or   X-API-Key: <secret>")
+		fmt.Fprintln(os.Stderr, " Set DOCPIPE_API_KEYS env to override; these are persisted otherwise.")
+		fmt.Fprintln(os.Stderr, "═══════════════════════════════════════════════════════════════════════")
+		fmt.Fprintln(os.Stderr, "")
+	}
 
 	recorder := analytics.New(version)
 	defer recorder.Stop()
@@ -102,7 +139,7 @@ func run() error {
 	convert := handlers.NewConvertHandler(browser)
 	legacy := handlers.NewLegacyConvertHandler(browser, log)
 	stats := handlers.NewStatsHandler(recorder, browser, cfg.RenderConcurrency, cfg.SnapshotInterval)
-	keys := auth.NewStore(cfg.APIKeys)
+	keys := auth.NewStore(apiKeys)
 	limiter := auth.NewLimiter(cfg.RateLimitRPS, cfg.RateLimitBurst)
 
 	// Paths excluded from analytics — self-observability shouldn't pollute totals.

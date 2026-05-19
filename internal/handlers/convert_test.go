@@ -14,12 +14,10 @@ func TestResolveHTML(t *testing.T) {
 		wantHTML string
 		wantCode string
 	}{
-		{"inline", convertRequest{HTML: "<p>hi</p>"}, "<p>hi</p>", ""},
-		{"base64", convertRequest{HTMLBase64: "PHA+aGk8L3A+"}, "<p>hi</p>", ""},
-		{"neither", convertRequest{}, "", httpx.CodeInvalidRequest},
-		{"both", convertRequest{HTML: "<p/>", HTMLBase64: "PHA+aGk8L3A+"}, "", httpx.CodeInvalidRequest},
+		{"valid base64", convertRequest{HTMLBase64: "PHA+aGk8L3A+"}, "<p>hi</p>", ""},
+		{"missing field", convertRequest{}, "", httpx.CodeInvalidRequest},
+		{"whitespace only is treated as missing", convertRequest{HTMLBase64: "   "}, "", httpx.CodeInvalidRequest},
 		{"bad base64", convertRequest{HTMLBase64: "!!!"}, "", httpx.CodeInvalidBase64},
-		{"whitespace only is treated as missing", convertRequest{HTML: "   "}, "", httpx.CodeInvalidRequest},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {

@@ -75,6 +75,7 @@ func (h *LegacyConvertHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Forward via the v2 surface, translating the field name.
+	// v1 used `base64_html`; v2 uses `html_base64`.
 	v2 := convertRequest{
 		HTMLBase64: req.Base64HTML,
 		Filename:   "admit_card.pdf",

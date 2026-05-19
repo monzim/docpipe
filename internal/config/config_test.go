@@ -6,12 +6,27 @@ import (
 	"time"
 )
 
-func TestLoad_RequiresAPIKeys(t *testing.T) {
+func TestLoad_APIKeysOptional(t *testing.T) {
+	// DOCPIPE_API_KEYS is now optional — auth.LoadOrGenerate handles the
+	// "no env set" case by generating + persisting keys.
 	t.Setenv(envAPIKeys, "")
-	if _, err := Load(); err == nil {
-		t.Fatal("expected error when DOCPIPE_API_KEYS is unset")
-	} else if !strings.Contains(err.Error(), envAPIKeys) {
-		t.Fatalf("error should mention env var, got: %v", err)
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("Load with no API keys should succeed, got: %v", err)
+	}
+	if len(c.APIKeys) != 0 {
+		t.Errorf("empty env should yield empty APIKeys map, got %d", len(c.APIKeys))
+	}
+}
+
+func TestLoad_APIKeysFromEnv(t *testing.T) {
+	t.Setenv(envAPIKeys, "alpha:s1,beta:s2")
+	c, err := Load()
+	if err != nil {
+		t.Fatalf("Load: %v", err)
+	}
+	if len(c.APIKeys) != 2 {
+		t.Errorf("got %d keys want 2", len(c.APIKeys))
 	}
 }
 
@@ -75,7 +90,7 @@ func TestParseAPIKeys(t *testing.T) {
 	}{
 		{"single", "alpha:secret", map[string]string{"alpha": "secret"}, ""},
 		{"multiple with spaces", " alpha:s1 , beta:s2 ", map[string]string{"alpha": "s1", "beta": "s2"}, ""},
-		{"empty", "", nil, "required"},
+		{"empty", "", nil, "empty"},
 		{"missing colon", "alpha", nil, "malformed"},
 		{"empty secret", "alpha:", nil, "malformed"},
 		{"empty name", ":secret", nil, "malformed"},

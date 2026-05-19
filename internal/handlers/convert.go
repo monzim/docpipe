@@ -18,9 +18,12 @@ import (
 )
 
 // convertRequest mirrors spec §6 request body.
+//
+// HTML must be base64-encoded — raw HTML in JSON is escape-fragile (newlines,
+// quotes, backslashes in inline styles all break naive callers). Base64 is one
+// well-defined encoding to keep the wire format unambiguous.
 type convertRequest struct {
-	HTML       string          `json:"html,omitempty"`
-	HTMLBase64 string          `json:"html_base64,omitempty"`
+	HTMLBase64 string          `json:"html_base64"`
 	Filename   string          `json:"filename,omitempty"`
 	Options    *requestOptions `json:"options,omitempty"`
 }
@@ -139,29 +142,20 @@ func (h *ConvertHandler) Handle(w http.ResponseWriter, r *http.Request) {
 	_, _ = w.Write(pdf)
 }
 
-// resolveHTML enforces "exactly one of html / html_base64" and decodes base64
-// when chosen. Returns the appropriate error code on failure.
+// resolveHTML decodes the required html_base64 field. Empty input is a
+// 400; a base64 decode error is a 400 with a more specific code so callers
+// can distinguish "you forgot the field" from "your encoding is wrong".
 func resolveHTML(req *convertRequest) (string, string, error) {
-	hasInline := strings.TrimSpace(req.HTML) != ""
-	hasB64 := strings.TrimSpace(req.HTMLBase64) != ""
-
-	switch {
-	case !hasInline && !hasB64:
+	if strings.TrimSpace(req.HTMLBase64) == "" {
 		return "", httpx.CodeInvalidRequest,
-			errors.New("exactly one of `html` or `html_base64` must be provided")
-	case hasInline && hasB64:
-		return "", httpx.CodeInvalidRequest,
-			errors.New("provide either `html` or `html_base64`, not both")
-	case hasInline:
-		return req.HTML, "", nil
-	default:
-		decoded, err := base64.StdEncoding.DecodeString(req.HTMLBase64)
-		if err != nil {
-			return "", httpx.CodeInvalidBase64,
-				fmt.Errorf("html_base64: %w", err)
-		}
-		return string(decoded), "", nil
+			errors.New("`html_base64` is required (base64-encoded HTML)")
 	}
+	decoded, err := base64.StdEncoding.DecodeString(req.HTMLBase64)
+	if err != nil {
+		return "", httpx.CodeInvalidBase64,
+			fmt.Errorf("html_base64: %w", err)
+	}
+	return string(decoded), "", nil
 }
 
 // buildOptions maps the JSON request options onto render.Options and applies

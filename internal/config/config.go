@@ -98,11 +98,17 @@ func Load() (*Config, error) {
 	c.LogLevel = strings.ToLower(envString(envLogLevel, "info"))
 	c.LogFormat = strings.ToLower(envString(envLogFormat, LogFormatJSON))
 
-	keys, keyErr := parseAPIKeys(os.Getenv(envAPIKeys))
-	if keyErr != nil {
-		errs = append(errs, keyErr.Error())
+	// DOCPIPE_API_KEYS is OPTIONAL now. If unset, the auth subsystem will
+	// auto-generate keys at startup and persist them to ${DOCPIPE_DATA_DIR}.
+	// If set, those keys are authoritative; the persisted file is ignored.
+	raw := strings.TrimSpace(os.Getenv(envAPIKeys))
+	if raw != "" {
+		keys, keyErr := parseAPIKeys(raw)
+		if keyErr != nil {
+			errs = append(errs, keyErr.Error())
+		}
+		c.APIKeys = keys
 	}
-	c.APIKeys = keys
 
 	c.CORSOrigins = parseList(os.Getenv(envCORSOrigins))
 
@@ -171,11 +177,12 @@ func (c *Config) Addr() string {
 func (c *Config) IsDevelopment() bool { return c.Env == EnvDevelopment }
 
 // parseAPIKeys parses a comma-separated list of `name:secret` pairs.
-// Empty input returns an error — DOCPIPE_API_KEYS is required.
+// Returns an error only for malformed input — empty is now a valid signal to
+// fall back to auto-generated keys (see auth.LoadOrGenerate).
 func parseAPIKeys(raw string) (map[string]string, error) {
 	raw = strings.TrimSpace(raw)
 	if raw == "" {
-		return nil, errors.New(envAPIKeys + " is required (comma-separated name:secret pairs)")
+		return nil, errors.New(envAPIKeys + " parsed empty")
 	}
 	out := make(map[string]string)
 	for i, pair := range strings.Split(raw, ",") {
