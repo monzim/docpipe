@@ -160,11 +160,27 @@ paths:
               schema:
                 $ref: '#/components/schemas/PublicStats'
 
+  /:
+    get:
+      tags: [Stats]
+      summary: Embedded HTML dashboard (canonical path)
+      description: |
+        Single-page dashboard at the root of the service. Polls /v1/stats
+        every 5 seconds. Always public; the dashboard HTML reveals nothing
+        sensitive — DOCPIPE_STATS_PUBLIC only gates the underlying JSON.
+      operationId: getDashboard
+      responses:
+        '200':
+          description: HTML page
+          content:
+            text/html:
+              schema: { type: string }
+
   /v1/stats/dashboard:
     get:
       tags: [Stats]
-      summary: Embedded HTML dashboard
-      description: Single-page dashboard that polls /v1/stats every 5 seconds.
+      summary: Embedded HTML dashboard (legacy alias)
+      description: Backwards-compatible alias for `/`. Same handler, same HTML.
       operationId: getStatsDashboard
       responses:
         '200':

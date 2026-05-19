@@ -165,13 +165,21 @@ func run() error {
 				r.Post("/api/html-to-pdf", legacy.Handle)
 			})
 
-			// Public stats + dashboard. Optionally auth-gated via DOCPIPE_STATS_PUBLIC.
+			// Dashboard — always public. The HTML alone reveals nothing
+			// sensitive; the stats JSON it fetches is what gets gated.
+			// Served at both `/` (canonical) and the legacy
+			// `/v1/stats/dashboard` so existing bookmarks still work.
+			r.Get("/", handlers.Dashboard)
+			r.Get("/v1/stats/dashboard", handlers.Dashboard)
+
+			// Stats JSON — optionally auth-gated via DOCPIPE_STATS_PUBLIC.
+			// When false, the dashboard will load but its data fetches 401
+			// and the error banner stays visible. That's the operator's call.
 			r.Group(func(r chi.Router) {
 				if !cfg.StatsPublic {
 					r.Use(auth.Middleware(keys))
 				}
 				r.Get("/v1/stats", stats.Handle)
-				r.Get("/v1/stats/dashboard", handlers.Dashboard)
 			})
 
 			// Swagger UI — dev-facing, gated by config.

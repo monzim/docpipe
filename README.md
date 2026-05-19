@@ -123,16 +123,17 @@ The persisted `api-keys.json` is left on disk but ignored. The next time you lau
 
 | Method | Path | Auth | Purpose |
 |---|---|---|---|
+| `GET`  | `/` | None | **Live HTML dashboard** (canonical) |
+| `GET`  | `/v1/stats/dashboard` | None | Same dashboard, legacy alias |
 | `POST` | `/v1/convert/html-to-pdf` | Bearer / `X-API-Key` | Convert HTML → PDF |
 | `POST` | `/api/html-to-pdf` | Bearer / `X-API-Key` | v1 compat shim (deprecated) |
 | `GET`  | `/v1/stats` | Public¹ | Redacted analytics snapshot |
-| `GET`  | `/v1/stats/dashboard` | Public¹ | Live HTML dashboard |
 | `GET`  | `/healthz` | None | Liveness |
 | `GET`  | `/readyz` | None | Readiness (browser health) |
 | `GET`  | `/swagger/` | None² | Swagger UI |
 
-¹ Set `DOCPIPE_STATS_PUBLIC=false` to require auth on stats.
-² Disabled in production unless `DOCPIPE_ENABLE_SWAGGER=true` or `DOCPIPE_ENV=development`.
+¹ Set `DOCPIPE_STATS_PUBLIC=false` to require auth on the stats JSON. The dashboard HTML itself is always public (it reveals nothing without the JSON); when stats is gated, the dashboard loads but shows an error banner where the numbers would be.
+² Disabled in production unless `DOCPIPE_ENABLE_SWAGGER=true` or `DOCPIPE_ENV=development`. The dashboard auto-detects Swagger availability and shows the "API docs" link only when it resolves.
 
 ### Convert example
 

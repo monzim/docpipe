@@ -2,261 +2,788 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>DocPipe — live</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="dark light">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#fafafa" media="(prefers-color-scheme: light)">
+  <meta name="description" content="DocPipe — live HTML to PDF rendering service dashboard.">
+  <title>DocPipe</title>
+
+  <!-- Inline SVG favicon so we don't need a /favicon.ico route -->
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'><rect width='24' height='24' rx='6' fill='%2310b981'/><path d='M7 7h6a4 4 0 010 8H7zm0 0v10' stroke='%23ffffff' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round' fill='none'/></svg>">
+
   <style>
     :root {
-      --bg: #0b0f14;
-      --panel: #121821;
-      --panel-2: #1a2230;
-      --text: #e6edf3;
-      --muted: #8693a4;
-      --accent: #6ee7b7;
-      --warn: #fbbf24;
-      --danger: #f87171;
-      --border: #1f2937;
-      --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      --bg:           #0a0a0a;
+      --bg-elev:      #111111;
+      --bg-elev-2:    #161616;
+      --border:       rgba(255, 255, 255, 0.07);
+      --border-hover: rgba(255, 255, 255, 0.14);
+      --text:         #fafafa;
+      --text-dim:     #a1a1aa;
+      --text-faint:   #71717a;
+      --accent:       #10b981;
+      --accent-soft:  rgba(16, 185, 129, 0.12);
+      --warn:         #f59e0b;
+      --warn-soft:    rgba(245, 158, 11, 0.12);
+      --danger:       #ef4444;
+      --danger-soft:  rgba(239, 68, 68, 0.12);
+      --bar-track:    rgba(255, 255, 255, 0.05);
+      --shadow-card:  none;
+
+      --font-sans:    "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", Helvetica, Arial, sans-serif;
+      --font-mono:    "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+      --radius:       12px;
+      --radius-sm:    8px;
+      --transition:   180ms cubic-bezier(0.4, 0, 0.2, 1);
     }
     @media (prefers-color-scheme: light) {
       :root {
-        --bg: #f7fafc;
-        --panel: #ffffff;
-        --panel-2: #f1f5f9;
-        --text: #0b1220;
-        --muted: #475569;
-        --accent: #047857;
-        --warn: #b45309;
-        --danger: #b91c1c;
-        --border: #e2e8f0;
+        --bg:           #fafafa;
+        --bg-elev:      #ffffff;
+        --bg-elev-2:    #f4f4f5;
+        --border:       rgba(0, 0, 0, 0.07);
+        --border-hover: rgba(0, 0, 0, 0.14);
+        --text:         #0a0a0a;
+        --text-dim:     #52525b;
+        --text-faint:   #71717a;
+        --accent:       #059669;
+        --accent-soft:  rgba(5, 150, 105, 0.10);
+        --warn:         #b45309;
+        --warn-soft:    rgba(180, 83, 9, 0.10);
+        --danger:       #b91c1c;
+        --danger-soft:  rgba(185, 28, 28, 0.10);
+        --bar-track:    rgba(0, 0, 0, 0.04);
+        --shadow-card:  0 1px 2px rgba(0, 0, 0, 0.04);
       }
     }
-    * { box-sizing: border-box; }
-    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
-    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
-
-    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
-    header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
-    header .meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
-    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-family: var(--mono); font-size: 12px; }
-    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
-    .dot.warn { background: var(--warn); }
-    .dot.bad { background: var(--danger); }
-
-    .grid { display: grid; gap: 16px; }
-    .grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-    .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-    @media (max-width: 800px) {
-      .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-      .grid.cols-2 { grid-template-columns: 1fr; }
+    @media (prefers-reduced-motion: reduce) {
+      :root { --transition: 0ms; }
+      * { animation: none !important; transition: none !important; }
     }
 
-    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
-    .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; margin: 0 0 12px; }
-    .number { font-family: var(--mono); font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
-    .number small { font-size: 14px; color: var(--muted); margin-left: 8px; font-weight: 400; }
-    .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--border); }
-    .stat:last-child { border-bottom: none; }
-    .stat .k { color: var(--muted); font-size: 13px; }
-    .stat .v { font-family: var(--mono); font-size: 14px; }
+    *, *::before, *::after { box-sizing: border-box; }
+    html { -webkit-text-size-adjust: 100%; }
+    html, body {
+      margin: 0; padding: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-sans);
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+    }
+    a {
+      color: inherit;
+      text-decoration: none;
+      transition: color var(--transition);
+    }
+    a:hover { color: var(--accent); }
+    a:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    button {
+      font: inherit; color: inherit; background: none; border: none;
+      cursor: pointer; padding: 0;
+    }
+    .visually-hidden {
+      position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px;
+      overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0;
+    }
+    .skip-link {
+      position: absolute; top: -100px; left: 16px;
+      background: var(--accent); color: #fff;
+      padding: 12px 16px; border-radius: var(--radius-sm);
+      font-weight: 500; z-index: 100;
+    }
+    .skip-link:focus { top: 16px; }
 
-    table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
-    th, td { text-align: left; padding: 8px 0; border-bottom: 1px dashed var(--border); }
-    th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
-    td.r, th.r { text-align: right; }
+    .wrap {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: clamp(20px, 4vw, 40px) clamp(16px, 4vw, 32px);
+    }
 
-    footer { margin-top: 32px; font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
-    a { color: inherit; }
-    .err { color: var(--danger); }
-    .coverage { color: var(--muted); font-size: 11px; margin-top: 4px; }
+    header.top {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 16px; flex-wrap: wrap;
+      padding-bottom: 28px;
+      margin-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .brand {
+      display: flex; align-items: center; gap: 12px;
+      font-weight: 600; font-size: 17px;
+      letter-spacing: -0.01em;
+    }
+    .brand-mark {
+      width: 28px; height: 28px;
+      background: var(--accent-soft);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      display: grid; place-items: center;
+      color: var(--accent);
+    }
+    .brand-mark svg { width: 16px; height: 16px; }
+    .brand-version {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-faint); margin-left: 4px;
+      padding: 2px 8px;
+      background: var(--bg-elev); border: 1px solid var(--border);
+      border-radius: 999px;
+    }
+    nav.links {
+      display: flex; align-items: center; gap: 4px;
+      font-size: 13px; color: var(--text-dim);
+    }
+    nav.links a {
+      padding: 6px 10px; border-radius: var(--radius-sm);
+      transition: background var(--transition), color var(--transition);
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    nav.links a:hover { background: var(--bg-elev); color: var(--text); }
+    nav.links a svg { width: 12px; height: 12px; opacity: 0.6; }
+    nav.links .sep { color: var(--text-faint); user-select: none; }
+
+    .status-strip {
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 12px; flex-wrap: wrap;
+      padding: 14px 18px;
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 24px;
+      font-size: 13px;
+    }
+    .status-strip .left { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 4px 10px;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      font-family: var(--font-mono); font-size: 12px;
+    }
+    .dot {
+      width: 7px; height: 7px; border-radius: 50%;
+      background: var(--accent);
+      animation: pulse 2s infinite;
+    }
+    .dot.warn   { background: var(--warn); }
+    .dot.danger { background: var(--danger); animation: none; }
+    @keyframes pulse {
+      0%   { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.4); }
+      70%  { box-shadow: 0 0 0 6px rgba(16, 185, 129, 0); }
+      100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0); }
+    }
+    .meta-text { color: var(--text-dim); font-size: 12px; }
+    .meta-text strong { color: var(--text); font-weight: 500; }
+
+    .heroes {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .hero {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-card);
+      transition: border-color var(--transition);
+    }
+    .hero:hover { border-color: var(--border-hover); }
+    .hero h2 {
+      margin: 0 0 10px;
+      font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
+    .hero .num {
+      font-family: var(--font-mono);
+      font-size: clamp(24px, 4vw, 32px); font-weight: 600;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      line-height: 1.1;
+      font-variant-numeric: tabular-nums;
+    }
+    .hero .num small {
+      font-size: 0.55em; font-weight: 400;
+      color: var(--text-dim); margin-left: 6px;
+    }
+    .hero .delta {
+      margin-top: 8px;
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-faint);
+    }
+
+    .grid {
+      display: grid;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+    .grid.cols-3 { grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+    .grid.cols-2 { grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
+
+    .card {
+      background: var(--bg-elev);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px;
+      box-shadow: var(--shadow-card);
+      transition: border-color var(--transition);
+    }
+    .card:hover { border-color: var(--border-hover); }
+    .card h3 {
+      margin: 0 0 14px;
+      font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-dim);
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .card h3 .badge {
+      font-family: var(--font-mono); font-size: 10px;
+      font-weight: 400; text-transform: none; letter-spacing: 0;
+      color: var(--text-faint);
+      padding: 2px 6px;
+      background: var(--bg-elev-2);
+      border-radius: 4px;
+    }
+    .stat-row {
+      display: flex; justify-content: space-between; align-items: baseline;
+      padding: 7px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .stat-row:first-of-type { padding-top: 0; }
+    .stat-row:last-of-type  { border-bottom: none; padding-bottom: 0; }
+    .stat-row .k { color: var(--text-dim); font-size: 13px; }
+    .stat-row .v {
+      font-family: var(--font-mono); font-size: 13px;
+      color: var(--text); font-variant-numeric: tabular-nums;
+    }
+    .stat-row .v .unit { color: var(--text-dim); font-weight: 400; margin-left: 4px; }
+
+    .coverage-note {
+      margin-top: 12px;
+      font-size: 11px;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+    }
+
+    .fail-list { display: flex; flex-direction: column; gap: 10px; }
+    .fail-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      gap: 12px;
+      align-items: center;
+    }
+    .fail-row .label {
+      font-family: var(--font-mono); font-size: 13px;
+      color: var(--text);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .fail-row .count {
+      font-family: var(--font-mono); font-size: 12px;
+      color: var(--text-dim); font-variant-numeric: tabular-nums;
+      text-align: right;
+    }
+    .fail-row .bar {
+      grid-column: 1 / -1;
+      height: 4px;
+      background: var(--bar-track);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .fail-row .fill {
+      display: block; height: 100%;
+      background: var(--danger);
+      opacity: 0.55;
+      transition: width 400ms ease-out;
+    }
+    .empty {
+      text-align: center;
+      padding: 24px 12px;
+      color: var(--text-faint);
+      font-size: 13px;
+    }
+
+    .browser-card .health {
+      display: flex; align-items: center; gap: 10px;
+      padding: 10px 12px; border-radius: var(--radius-sm);
+      background: var(--accent-soft);
+      margin-bottom: 14px;
+      font-family: var(--font-mono); font-size: 13px;
+    }
+    .browser-card .health.bad { background: var(--danger-soft); color: var(--danger); }
+    .browser-card .health .dot { animation: none; }
+
+    footer.bottom {
+      display: flex; justify-content: space-between; align-items: center;
+      gap: 12px; flex-wrap: wrap;
+      padding-top: 20px; margin-top: 12px;
+      border-top: 1px solid var(--border);
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-faint);
+    }
+    footer.bottom .refresh {
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    footer.bottom .refresh button {
+      color: var(--text-dim);
+      padding: 4px 8px;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      transition: background var(--transition), color var(--transition);
+    }
+    footer.bottom .refresh button:hover { background: var(--bg-elev); color: var(--text); }
+
+    .num.loading, .v.loading {
+      color: var(--text-faint);
+      opacity: 0.5;
+    }
+    .banner {
+      display: none;
+      margin-bottom: 20px;
+      padding: 12px 16px;
+      background: var(--danger-soft);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      font-size: 13px;
+      color: var(--text);
+    }
+    .banner.visible { display: block; }
+
+    @media (max-width: 600px) {
+      header.top { padding-bottom: 20px; margin-bottom: 20px; }
+      nav.links { font-size: 12px; }
+      nav.links a { padding: 4px 8px; }
+      .status-strip { padding: 12px 14px; }
+      .heroes { gap: 12px; }
+      .hero { padding: 16px; }
+      .card { padding: 16px; }
+    }
   </style>
 </head>
 <body>
+
+<a href="#main" class="skip-link">Skip to main content</a>
+
 <div class="wrap">
-  <header>
-    <h1>DocPipe <span class="meta" id="version"></span></h1>
-    <div class="meta">
-      <span class="pill"><span class="dot" id="dot"></span><span id="status">connecting…</span></span>
-      <span id="uptime" style="margin-left:8px"></span>
+
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M7 7h6a4 4 0 010 8H7zm0 0v10"/>
+        </svg>
+      </span>
+      DocPipe
+      <span class="brand-version" id="version" aria-label="version">v—</span>
     </div>
+    <nav class="links" aria-label="External links">
+      <a id="lnk-swagger" href="/swagger/" rel="noopener" hidden>
+        API docs
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 17L17 7M17 7H8M17 7v9"/>
+        </svg>
+      </a>
+      <span class="sep" id="sep-swagger" hidden>·</span>
+      <a href="/v1/stats" rel="noopener">
+        Stats JSON
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M7 17L17 7M17 7H8M17 7v9"/>
+        </svg>
+      </a>
+      <span class="sep">·</span>
+      <a href="/healthz" rel="noopener">Health</a>
+      <span class="sep">·</span>
+      <a href="/readyz" rel="noopener">Ready</a>
+    </nav>
   </header>
 
-  <section class="grid cols-4" style="margin-bottom: 20px;">
-    <div class="card">
-      <h2>Requests</h2>
-      <div class="number" id="reqs">—</div>
-    </div>
-    <div class="card">
-      <h2>PDFs</h2>
-      <div class="number" id="pdfs">—</div>
-    </div>
-    <div class="card">
-      <h2>Success</h2>
-      <div class="number" id="success">—</div>
-    </div>
-    <div class="card">
-      <h2>Now</h2>
-      <div class="number"><span id="rps">—</span><small>r/s</small></div>
-    </div>
-  </section>
+  <main id="main">
 
-  <section class="grid cols-2" style="margin-bottom: 20px;">
-    <div class="card">
-      <h2>Latency</h2>
-      <div class="stat"><span class="k">p50</span><span class="v" id="p50">— ms</span></div>
-      <div class="stat"><span class="k">p90</span><span class="v" id="p90">— ms</span></div>
-      <div class="stat"><span class="k">p95</span><span class="v" id="p95">— ms</span></div>
-      <div class="stat"><span class="k">p99</span><span class="v" id="p99">— ms</span></div>
-      <div class="stat"><span class="k">max</span><span class="v" id="lmax">— ms</span></div>
-    </div>
-    <div class="card">
-      <h2>Throughput</h2>
-      <div class="stat"><span class="k">now</span><span class="v"><span id="t_now">—</span> r/s</span></div>
-      <div class="stat"><span class="k">peak 1m</span><span class="v"><span id="t_1m">—</span> r/s</span></div>
-      <div class="stat"><span class="k">peak 5m</span><span class="v"><span id="t_5m">—</span> r/s</span></div>
-      <div class="stat"><span class="k">peak all-time</span><span class="v"><span id="t_all">—</span> r/s <small id="t_all_at" style="margin-left:8px;color:var(--muted)"></small></span></div>
-      <div class="stat"><span class="k">concurrency</span><span class="v"><span id="conc">—</span>/<span id="conc_max">—</span> tabs</span></div>
-    </div>
-  </section>
+    <section class="status-strip" aria-label="Service status">
+      <div class="left">
+        <span class="pill"><span class="dot" id="dot" aria-hidden="true"></span><span id="status">connecting…</span></span>
+        <span class="meta-text">Uptime <strong id="uptime">—</strong></span>
+        <span class="meta-text">Started <strong id="started">—</strong></span>
+      </div>
+      <div class="meta-text">
+        Auto-refresh every <strong>5s</strong> · Last update <strong id="refreshed">—</strong>
+      </div>
+    </section>
 
-  <section class="grid cols-2" style="margin-bottom: 20px;">
-    <div class="card">
-      <h2>Last 24h</h2>
-      <div class="stat"><span class="k">requests</span><span class="v" id="w24_req">—</span></div>
-      <div class="stat"><span class="k">pdfs</span><span class="v" id="w24_pdf">—</span></div>
-      <div class="stat"><span class="k">failures</span><span class="v" id="w24_fail">—</span></div>
-      <div class="stat"><span class="k">p95</span><span class="v" id="w24_p95">— ms</span></div>
-      <div class="coverage" id="w24_cov"></div>
-    </div>
-    <div class="card">
-      <h2>Failures by reason</h2>
-      <table id="fail_tbl">
-        <thead><tr><th>reason</th><th class="r">count</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div class="coverage" id="fail_empty"></div>
-    </div>
-  </section>
+    <div class="banner" id="error-banner" role="alert" aria-live="assertive"></div>
 
-  <section class="card" style="margin-bottom: 20px;">
-    <h2>Browser</h2>
-    <div class="grid cols-4">
-      <div class="stat"><span class="k">health</span><span class="v" id="b_health">—</span></div>
-      <div class="stat"><span class="k">restarts</span><span class="v" id="b_restarts">—</span></div>
-      <div class="stat"><span class="k">last restart</span><span class="v" id="b_last">—</span></div>
-      <div class="stat"><span class="k">reason</span><span class="v" id="b_reason">—</span></div>
-    </div>
-  </section>
+    <section class="heroes" aria-label="Key metrics" aria-live="polite">
+      <article class="hero">
+        <h2>Requests</h2>
+        <div class="num loading" id="reqs">—</div>
+        <div class="delta" id="bytes-in">—</div>
+      </article>
+      <article class="hero">
+        <h2>PDFs generated</h2>
+        <div class="num loading" id="pdfs">—</div>
+        <div class="delta" id="bytes-out">—</div>
+      </article>
+      <article class="hero">
+        <h2>Success rate</h2>
+        <div class="num loading" id="success">—</div>
+        <div class="delta" id="failures">—</div>
+      </article>
+      <article class="hero">
+        <h2>Right now</h2>
+        <div class="num loading"><span id="rps">—</span><small>r/s</small></div>
+        <div class="delta" id="inflight">—</div>
+      </article>
+    </section>
 
-  <footer>
-    <span>refreshed <span id="refreshed">never</span></span>
-    <span>polls <code>/v1/stats</code> every 5s</span>
+    <section class="grid cols-3" aria-label="Latency, throughput, concurrency">
+
+      <article class="card">
+        <h3>Latency <span class="badge">milliseconds</span></h3>
+        <div class="stat-row"><span class="k">p50</span><span class="v" id="p50">—<span class="unit">ms</span></span></div>
+        <div class="stat-row"><span class="k">p90</span><span class="v" id="p90">—<span class="unit">ms</span></span></div>
+        <div class="stat-row"><span class="k">p95</span><span class="v" id="p95">—<span class="unit">ms</span></span></div>
+        <div class="stat-row"><span class="k">p99</span><span class="v" id="p99">—<span class="unit">ms</span></span></div>
+        <div class="stat-row"><span class="k">mean</span><span class="v" id="lmean">—<span class="unit">ms</span></span></div>
+        <div class="stat-row"><span class="k">max</span><span class="v" id="lmax">—<span class="unit">ms</span></span></div>
+      </article>
+
+      <article class="card">
+        <h3>Throughput <span class="badge">req/sec</span></h3>
+        <div class="stat-row"><span class="k">now</span><span class="v" id="t-now">—</span></div>
+        <div class="stat-row"><span class="k">peak last 1m</span><span class="v" id="t-1m">—</span></div>
+        <div class="stat-row"><span class="k">peak last 5m</span><span class="v" id="t-5m">—</span></div>
+        <div class="stat-row"><span class="k">peak all-time</span><span class="v" id="t-all">—</span></div>
+        <div class="coverage-note" id="t-all-at"></div>
+      </article>
+
+      <article class="card">
+        <h3>Concurrency <span class="badge">tabs</span></h3>
+        <div class="stat-row"><span class="k">in flight</span><span class="v" id="conc-now">—</span></div>
+        <div class="stat-row"><span class="k">peak</span><span class="v" id="conc-peak">—</span></div>
+        <div class="stat-row"><span class="k">max configured</span><span class="v" id="conc-max">—</span></div>
+        <div class="stat-row"><span class="k">pages estimated</span><span class="v" id="pages">—</span></div>
+      </article>
+
+    </section>
+
+    <section class="grid cols-2" aria-label="Recent windows and browser health">
+
+      <article class="card">
+        <h3>Last 1 hour</h3>
+        <div class="stat-row"><span class="k">requests</span><span class="v" id="w1h-req">—</span></div>
+        <div class="stat-row"><span class="k">pdfs</span><span class="v" id="w1h-pdf">—</span></div>
+        <div class="stat-row"><span class="k">failures</span><span class="v" id="w1h-fail">—</span></div>
+        <div class="stat-row"><span class="k">p95</span><span class="v" id="w1h-p95">—<span class="unit">ms</span></span></div>
+        <div class="coverage-note" id="w1h-cov"></div>
+      </article>
+
+      <article class="card">
+        <h3>Last 24 hours</h3>
+        <div class="stat-row"><span class="k">requests</span><span class="v" id="w24-req">—</span></div>
+        <div class="stat-row"><span class="k">pdfs</span><span class="v" id="w24-pdf">—</span></div>
+        <div class="stat-row"><span class="k">failures</span><span class="v" id="w24-fail">—</span></div>
+        <div class="stat-row"><span class="k">p95</span><span class="v" id="w24-p95">—<span class="unit">ms</span></span></div>
+        <div class="coverage-note" id="w24-cov"></div>
+      </article>
+
+    </section>
+
+    <section class="grid cols-2" aria-label="Failures and browser">
+
+      <article class="card">
+        <h3>Failures by reason</h3>
+        <div class="fail-list" id="fail-list" aria-live="polite"></div>
+        <div class="empty" id="fail-empty" hidden>No failures recorded</div>
+      </article>
+
+      <article class="card browser-card">
+        <h3>Browser</h3>
+        <div class="health" id="b-health"><span class="dot" aria-hidden="true"></span><span id="b-health-text">—</span></div>
+        <div class="stat-row"><span class="k">restarts</span><span class="v" id="b-restarts">—</span></div>
+        <div class="stat-row"><span class="k">last restart</span><span class="v" id="b-last">—</span></div>
+        <div class="stat-row"><span class="k">last reason</span><span class="v" id="b-reason">—</span></div>
+        <div class="stat-row"><span class="k">snapshot saved</span><span class="v" id="snap-last">—</span></div>
+        <div class="stat-row"><span class="k">snapshot next</span><span class="v" id="snap-next">—</span></div>
+      </article>
+
+    </section>
+
+  </main>
+
+  <footer class="bottom">
+    <span>DocPipe — HTML to PDF rendering</span>
+    <span class="refresh">
+      <span>Polls <code>/v1/stats</code> every 5s</span>
+      <button id="refresh-now" type="button" aria-label="Refresh now">Refresh</button>
+    </span>
   </footer>
+
 </div>
 
 <script>
 (function () {
-  const $ = id => document.getElementById(id);
-  const fmt = n => (n == null ? "—" : n.toLocaleString());
-  const pct = n => (n == null ? "—" : (n * 100).toFixed(2) + "%");
-  const ms = n => (n == null ? "— ms" : n.toLocaleString() + " ms");
-  const fmtUptime = sec => {
-    if (sec == null) return "";
+  "use strict";
+
+  const $ = (id) => document.getElementById(id);
+  const nf = new Intl.NumberFormat("en-US");
+  const fmt = (n) => (n == null ? "—" : nf.format(n));
+  const pct = (n) => (n == null ? "—" : (n * 100).toFixed(2) + "%");
+
+  function fmtMs(n) {
+    if (n == null || n === 0) return "—";
+    if (n < 1000) return nf.format(n);
+    return (n / 1000).toFixed(n < 10000 ? 2 : 1);
+  }
+  function fmtMsUnit(n) {
+    if (n == null || n === 0) return "ms";
+    return n < 1000 ? "ms" : "s";
+  }
+  function fmtRps(n) {
+    if (n == null) return "—";
+    if (n < 10) return n.toFixed(1);
+    return nf.format(Math.round(n));
+  }
+  function fmtBytes(n) {
+    if (n == null) return "—";
+    if (n < 1024) return n + " B";
+    const u = ["KB", "MB", "GB", "TB"];
+    let v = n / 1024, i = 0;
+    while (v >= 1024 && i < u.length - 1) { v /= 1024; i++; }
+    return (v < 10 ? v.toFixed(1) : Math.round(v)) + " " + u[i];
+  }
+  function fmtUptime(sec) {
+    if (sec == null) return "—";
     const d = Math.floor(sec / 86400);
     const h = Math.floor((sec % 86400) / 3600);
     const m = Math.floor((sec % 3600) / 60);
-    if (d) return "up " + d + "d " + h + "h";
-    if (h) return "up " + h + "h " + m + "m";
-    return "up " + m + "m";
-  };
-  const fmtCoverage = sec => {
-    if (sec == null || sec <= 0) return "based on no data yet";
-    if (sec >= 3600) return "based on " + Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
-    if (sec >= 60) return "based on " + Math.floor(sec / 60) + "m of data";
-    return "based on " + sec + "s of data";
-  };
+    const s = Math.floor(sec % 60);
+    if (d) return d + "d " + h + "h";
+    if (h) return h + "h " + m + "m";
+    if (m) return m + "m " + s + "s";
+    return s + "s";
+  }
+  function fmtCoverage(sec, totalLabel) {
+    if (sec == null || sec <= 0) return "no data yet";
+    if (sec >= 3600) {
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      return "based on " + h + "h " + m + "m of " + totalLabel;
+    }
+    if (sec >= 60) return "based on " + Math.floor(sec / 60) + "m of " + totalLabel;
+    return "based on " + sec + "s of " + totalLabel;
+  }
+  function fmtAbsTime(iso) {
+    if (!iso || iso === "0001-01-01T00:00:00Z") return "—";
+    const d = new Date(iso);
+    if (isNaN(d.getTime())) return "—";
+    return d.toLocaleString(undefined, {
+      year: "numeric", month: "short", day: "numeric",
+      hour: "2-digit", minute: "2-digit"
+    });
+  }
+  function fmtRelTime(iso) {
+    if (!iso || iso === "0001-01-01T00:00:00Z") return "—";
+    const then = new Date(iso).getTime();
+    if (isNaN(then)) return "—";
+    const diff = (Date.now() - then) / 1000;
+    if (diff < 60)     return Math.floor(diff) + "s ago";
+    if (diff < 3600)   return Math.floor(diff / 60) + "m ago";
+    if (diff < 86400)  return Math.floor(diff / 3600) + "h ago";
+    return Math.floor(diff / 86400) + "d ago";
+  }
+
+  function setNum(id, val) {
+    const el = $(id);
+    el.textContent = val;
+    el.classList.remove("loading");
+  }
+  function setV(id, val, unit) {
+    const el = $(id);
+    const unitEl = el.querySelector(".unit");
+    el.textContent = val;
+    if (unitEl) {
+      if (unit !== undefined) unitEl.textContent = unit;
+      el.appendChild(unitEl);
+    }
+  }
+
+  function applyStatus(s) {
+    const status = (s.service && s.service.status) || "healthy";
+    const browserHealthy = !!(s.browser && s.browser.healthy);
+    $("status").textContent = browserHealthy ? status : "degraded";
+    const dot = $("dot");
+    dot.className = "dot" + (browserHealthy ? "" : (status === "degraded" ? " warn" : " danger"));
+    $("version").textContent = "v" + ((s.service && s.service.version) || "?");
+    $("uptime").textContent = fmtUptime(s.service && s.service.uptime_seconds);
+    $("started").textContent = fmtAbsTime(s.service && s.service.started_at);
+  }
+
+  function applyHeroes(s) {
+    setNum("reqs", fmt(s.totals.requests));
+    setNum("pdfs", fmt(s.totals.pdfs_generated));
+    setNum("success", pct(s.totals.success_rate));
+    $("rps").textContent = (s.throughput.current_rps || 0).toFixed(1);
+    $("rps").parentElement.classList.remove("loading");
+
+    $("bytes-in").textContent  = "in: "  + fmtBytes(s.totals.bytes_in);
+    $("bytes-out").textContent = "out: " + fmtBytes(s.totals.bytes_out);
+    const fails = s.totals.failures || 0;
+    $("failures").textContent = fails === 0 ? "0 failures" : fmt(fails) + " failures";
+    const inFlight = (s.concurrency && s.concurrency.current_in_flight) || 0;
+    $("inflight").textContent = inFlight + " in flight";
+  }
+
+  function applyLatency(s) {
+    setV("p50",   fmtMs(s.latency_ms.p50),  fmtMsUnit(s.latency_ms.p50));
+    setV("p90",   fmtMs(s.latency_ms.p90),  fmtMsUnit(s.latency_ms.p90));
+    setV("p95",   fmtMs(s.latency_ms.p95),  fmtMsUnit(s.latency_ms.p95));
+    setV("p99",   fmtMs(s.latency_ms.p99),  fmtMsUnit(s.latency_ms.p99));
+    setV("lmean", fmtMs(s.latency_ms.mean), fmtMsUnit(s.latency_ms.mean));
+    setV("lmax",  fmtMs(s.latency_ms.max),  fmtMsUnit(s.latency_ms.max));
+  }
+
+  function applyThroughput(s) {
+    $("t-now").textContent = fmtRps(s.throughput.current_rps) + " /s";
+    $("t-1m").textContent  = fmtRps(s.throughput.peak_rps_1m) + " /s";
+    $("t-5m").textContent  = fmtRps(s.throughput.peak_rps_5m) + " /s";
+    $("t-all").textContent = fmtRps(s.throughput.peak_rps_all_time) + " /s";
+    const at = s.throughput.peak_rps_at;
+    $("t-all-at").textContent = (at && at !== "0001-01-01T00:00:00Z")
+      ? "peak set " + fmtRelTime(at)
+      : "";
+  }
+
+  function applyConcurrency(s) {
+    $("conc-now").textContent  = fmt((s.concurrency && s.concurrency.current_in_flight) || 0);
+    $("conc-peak").textContent = fmt((s.concurrency && s.concurrency.peak_in_flight) || 0);
+    $("conc-max").textContent  = fmt((s.concurrency && s.concurrency.max_configured) || 0);
+    $("pages").textContent     = fmt(s.totals.pdf_pages_estimated || 0);
+  }
+
+  function applyWindow(prefix, w) {
+    w = w || {};
+    $(prefix + "-req").textContent  = fmt(w.requests);
+    $(prefix + "-pdf").textContent  = fmt(w.pdfs);
+    $(prefix + "-fail").textContent = fmt(w.failures);
+    setV(prefix + "-p95", fmtMs(w.p95_ms), fmtMsUnit(w.p95_ms));
+    $(prefix + "-cov").textContent = fmtCoverage(w.coverage_seconds,
+      prefix === "w1h" ? "the last hour" : "the last 24 hours");
+  }
+
+  function applyFailures(s) {
+    const fails = s.failures_by_reason || {};
+    const entries = Object.entries(fails).sort((a, b) => b[1] - a[1]);
+    const max = entries.reduce((m, [, v]) => v > m ? v : m, 0);
+    const list = $("fail-list");
+    list.replaceChildren();
+    if (entries.length === 0) {
+      $("fail-empty").hidden = false;
+      return;
+    }
+    $("fail-empty").hidden = true;
+    for (const [reason, count] of entries) {
+      const row = document.createElement("div");
+      row.className = "fail-row";
+      const label = document.createElement("span");
+      label.className = "label";
+      label.textContent = reason;
+      const cnt = document.createElement("span");
+      cnt.className = "count";
+      cnt.textContent = fmt(count);
+      const bar = document.createElement("div");
+      bar.className = "bar";
+      const fill = document.createElement("span");
+      fill.className = "fill";
+      fill.style.width = max > 0 ? ((count / max) * 100).toFixed(1) + "%" : "0%";
+      bar.appendChild(fill);
+      row.append(label, cnt, bar);
+      list.appendChild(row);
+    }
+  }
+
+  function applyBrowser(s) {
+    const healthy = !!(s.browser && s.browser.healthy);
+    const card = $("b-health");
+    card.classList.toggle("bad", !healthy);
+    $("b-health-text").textContent = healthy ? "Healthy — Chromium is responsive" : "Unhealthy — supervisor will recycle";
+    $("b-restarts").textContent = fmt((s.browser && s.browser.restarts) || 0);
+    $("b-last").textContent = (s.browser && s.browser.last_restart_at)
+      ? fmtAbsTime(s.browser.last_restart_at) + " (" + fmtRelTime(s.browser.last_restart_at) + ")"
+      : "—";
+    $("b-reason").textContent = (s.browser && s.browser.last_restart_reason) || "—";
+
+    const snap = s.snapshot || {};
+    $("snap-last").textContent = snap.last_persisted_at
+      ? fmtAbsTime(snap.last_persisted_at) + " (" + fmtRelTime(snap.last_persisted_at) + ")"
+      : "—";
+    $("snap-next").textContent = snap.next_persist_at
+      ? fmtAbsTime(snap.next_persist_at)
+      : "—";
+  }
+
+  function applyAll(s) {
+    applyStatus(s);
+    applyHeroes(s);
+    applyLatency(s);
+    applyThroughput(s);
+    applyConcurrency(s);
+    applyWindow("w1h", s.windows && s.windows.last_1h);
+    applyWindow("w24", s.windows && s.windows.last_24h);
+    applyFailures(s);
+    applyBrowser(s);
+  }
+
+  const banner = $("error-banner");
+  function showError(msg) {
+    banner.textContent = "Unable to fetch /v1/stats — " + msg + ". Retrying…";
+    banner.classList.add("visible");
+  }
+  function clearError() {
+    banner.classList.remove("visible");
+    banner.textContent = "";
+  }
 
   async function tick() {
     try {
       const r = await fetch("/v1/stats", { cache: "no-store" });
       if (!r.ok) throw new Error("HTTP " + r.status);
       const s = await r.json();
-      apply(s);
-      $("status").textContent = (s.service && s.service.status) || "ok";
-      $("status").classList.remove("err");
-      $("dot").className = "dot" + (s.browser && !s.browser.healthy ? " bad" : "");
+      applyAll(s);
+      clearError();
     } catch (e) {
-      $("status").textContent = "offline: " + e.message;
-      $("status").classList.add("err");
-      $("dot").className = "dot bad";
+      showError(e.message);
+    } finally {
+      $("refreshed").textContent = new Date().toLocaleTimeString();
     }
-    $("refreshed").textContent = new Date().toLocaleTimeString();
   }
 
-  // Build a single <tr> with createElement + textContent so all rendered
-  // values are treated as text (no HTML parsing path, no XSS risk).
-  function failureRow(reason, count) {
-    const tr = document.createElement("tr");
-    const td1 = document.createElement("td");
-    td1.textContent = reason;
-    const td2 = document.createElement("td");
-    td2.className = "r";
-    td2.textContent = fmt(count);
-    tr.appendChild(td1);
-    tr.appendChild(td2);
-    return tr;
+  async function probeSwagger() {
+    try {
+      const r = await fetch("/swagger/", { method: "HEAD", cache: "no-store" });
+      if (r.ok) {
+        $("lnk-swagger").hidden = false;
+        $("sep-swagger").hidden = false;
+      }
+    } catch (_) { /* leave hidden */ }
   }
 
-  function apply(s) {
-    $("version").textContent = "v" + ((s.service && s.service.version) || "?");
-    $("uptime").textContent = fmtUptime(s.service && s.service.uptime_seconds);
-
-    $("reqs").textContent = fmt(s.totals.requests);
-    $("pdfs").textContent = fmt(s.totals.pdfs_generated);
-    $("success").textContent = pct(s.totals.success_rate);
-    $("rps").textContent = (s.throughput.current_rps || 0).toFixed(1);
-
-    $("p50").textContent = ms(s.latency_ms.p50);
-    $("p90").textContent = ms(s.latency_ms.p90);
-    $("p95").textContent = ms(s.latency_ms.p95);
-    $("p99").textContent = ms(s.latency_ms.p99);
-    $("lmax").textContent = ms(s.latency_ms.max);
-
-    $("t_now").textContent = (s.throughput.current_rps || 0).toFixed(1);
-    $("t_1m").textContent = (s.throughput.peak_rps_1m || 0).toFixed(1);
-    $("t_5m").textContent = (s.throughput.peak_rps_5m || 0).toFixed(1);
-    $("t_all").textContent = (s.throughput.peak_rps_all_time || 0).toFixed(1);
-    if (s.throughput.peak_rps_at && s.throughput.peak_rps_at !== "0001-01-01T00:00:00Z") {
-      $("t_all_at").textContent = "(" + new Date(s.throughput.peak_rps_at).toLocaleString() + ")";
-    } else {
-      $("t_all_at").textContent = "";
-    }
-
-    $("conc").textContent = s.concurrency.current_in_flight;
-    $("conc_max").textContent = s.concurrency.max_configured;
-
-    const w24 = s.windows.last_24h || {};
-    $("w24_req").textContent = fmt(w24.requests);
-    $("w24_pdf").textContent = fmt(w24.pdfs);
-    $("w24_fail").textContent = fmt(w24.failures);
-    $("w24_p95").textContent = ms(w24.p95_ms);
-    $("w24_cov").textContent = fmtCoverage(w24.coverage_seconds);
-
-    const tbody = $("fail_tbl").querySelector("tbody");
-    const fails = s.failures_by_reason || {};
-    const keys = Object.keys(fails).sort((a, b) => fails[b] - fails[a]);
-    const rows = keys.map(k => failureRow(k, fails[k]));
-    tbody.replaceChildren(...rows);
-    $("fail_empty").textContent = keys.length === 0 ? "no failures recorded" : "";
-
-    $("b_health").textContent = s.browser.healthy ? "healthy" : "unhealthy";
-    $("b_restarts").textContent = fmt(s.browser.restarts);
-    $("b_last").textContent = s.browser.last_restart_at ? new Date(s.browser.last_restart_at).toLocaleString() : "never";
-    $("b_reason").textContent = s.browser.last_restart_reason || "—";
-  }
-
-  tick();
-  setInterval(tick, 5000);
+  document.addEventListener("DOMContentLoaded", () => {
+    probeSwagger();
+    tick();
+    setInterval(tick, 5000);
+    $("refresh-now").addEventListener("click", tick);
+    document.addEventListener("visibilitychange", () => {
+      if (!document.hidden) tick();
+    });
+  });
 })();
 </script>
 </body>
