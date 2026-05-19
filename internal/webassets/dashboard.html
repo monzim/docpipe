@@ -357,6 +357,136 @@
     }
     .banner.visible { display: block; }
 
+    .grid.cols-1 { grid-template-columns: 1fr; }
+
+    .tool-card .badge { background: var(--accent-soft); color: var(--accent); }
+    .tool-help {
+      margin: 0 0 16px;
+      font-size: 13px;
+      color: var(--text-dim);
+      line-height: 1.55;
+    }
+    .tool-help code {
+      font-family: var(--font-mono); font-size: 12px;
+      padding: 1px 6px;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      color: var(--text);
+    }
+    .tool-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 14px;
+    }
+    .tool-col { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+    .tool-label-row {
+      display: flex; align-items: baseline; justify-content: space-between; gap: 8px;
+    }
+    .tool-label {
+      font-size: 11px; font-weight: 500;
+      text-transform: uppercase; letter-spacing: 0.08em;
+      color: var(--text-dim);
+    }
+    .tool-meta-stat {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--text-faint); font-variant-numeric: tabular-nums;
+    }
+    .tool-textarea {
+      width: 100%;
+      min-height: 180px;
+      resize: vertical;
+      padding: 12px 14px;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      color: var(--text);
+      font-family: var(--font-mono);
+      font-size: 12.5px;
+      line-height: 1.55;
+      transition: border-color var(--transition), background var(--transition);
+    }
+    .tool-textarea:hover { border-color: var(--border-hover); }
+    .tool-textarea:focus-visible {
+      outline: none;
+      border-color: var(--accent);
+      background: var(--bg-elev);
+    }
+    .tool-textarea[readonly] { color: var(--text-dim); }
+    .tool-actions {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      margin-top: 14px;
+    }
+    .tool-btn {
+      font-family: var(--font-sans);
+      font-size: 12px; font-weight: 500;
+      color: var(--text-dim);
+      padding: 7px 12px;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      cursor: pointer;
+      transition: background var(--transition), color var(--transition), border-color var(--transition);
+    }
+    .tool-btn:hover { background: var(--bg-elev); color: var(--text); border-color: var(--border-hover); }
+    .tool-btn.primary {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #ffffff;
+    }
+    .tool-btn.primary:hover {
+      filter: brightness(1.08);
+      color: #ffffff;
+    }
+    .tool-btn:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
+    .tool-feedback {
+      font-family: var(--font-mono); font-size: 11px;
+      color: var(--accent);
+      margin-left: auto;
+      min-height: 1em;
+      transition: opacity var(--transition);
+    }
+    .tool-feedback.err { color: var(--danger); }
+    .tool-details {
+      margin-top: 14px;
+      border-top: 1px solid var(--border);
+      padding-top: 14px;
+    }
+    .tool-details > summary {
+      cursor: pointer;
+      font-size: 12px;
+      color: var(--text-dim);
+      user-select: none;
+      list-style: none;
+    }
+    .tool-details > summary::-webkit-details-marker { display: none; }
+    .tool-details > summary::before {
+      content: "\25B8";
+      display: inline-block;
+      margin-right: 6px;
+      transition: transform var(--transition);
+      color: var(--text-faint);
+    }
+    .tool-details[open] > summary::before { transform: rotate(90deg); }
+    .tool-details > summary:hover { color: var(--text); }
+    .tool-pre {
+      margin: 12px 0 0;
+      padding: 12px 14px;
+      background: var(--bg-elev-2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius-sm);
+      font-family: var(--font-mono);
+      font-size: 12px;
+      line-height: 1.55;
+      color: var(--text);
+      overflow-x: auto;
+      white-space: pre;
+      -webkit-overflow-scrolling: touch;
+    }
+
     @media (max-width: 600px) {
       header.top { padding-bottom: 20px; margin-bottom: 20px; }
       nav.links { font-size: 12px; }
@@ -365,6 +495,7 @@
       .heroes { gap: 12px; }
       .hero { padding: 16px; }
       .card { padding: 16px; }
+      .tool-textarea { min-height: 160px; font-size: 12px; }
     }
   </style>
 </head>
@@ -514,6 +645,62 @@
         <div class="stat-row"><span class="k">snapshot next</span><span class="v" id="snap-next">—</span></div>
       </article>
 
+    </section>
+
+    <section class="grid cols-1" aria-label="Utilities">
+      <article class="card tool-card">
+        <h3>HTML to Base64 encoder <span class="badge">utility</span></h3>
+        <p class="tool-help">
+          Paste HTML below and copy the base64 string into the
+          <code>html_base64</code> field of <code>POST /v1/convert/html-to-pdf</code>.
+          Encoding runs entirely in your browser — nothing is uploaded. UTF-8 safe (Bangla, CJK, emoji).
+        </p>
+
+        <div class="tool-grid">
+          <div class="tool-col">
+            <div class="tool-label-row">
+              <label for="enc-input" class="tool-label">HTML input</label>
+              <span class="tool-meta-stat" id="enc-input-stats">0 chars</span>
+            </div>
+            <textarea
+              id="enc-input"
+              class="tool-textarea"
+              rows="10"
+              placeholder="&lt;!doctype html&gt;&#10;&lt;html&gt;&#10;  &lt;body&gt;&#10;    &lt;h1&gt;Hello&lt;/h1&gt;&#10;  &lt;/body&gt;&#10;&lt;/html&gt;"
+              spellcheck="false"
+              autocomplete="off"
+              autocorrect="off"
+              autocapitalize="off"
+              aria-describedby="enc-input-stats"></textarea>
+          </div>
+          <div class="tool-col">
+            <div class="tool-label-row">
+              <label for="enc-output" class="tool-label">Base64 output</label>
+              <span class="tool-meta-stat" id="enc-output-stats">0 chars</span>
+            </div>
+            <textarea
+              id="enc-output"
+              class="tool-textarea"
+              rows="10"
+              readonly
+              placeholder="base64 appears here as you type"
+              aria-describedby="enc-output-stats"
+              aria-live="off"></textarea>
+          </div>
+        </div>
+
+        <div class="tool-actions">
+          <button id="enc-sample" type="button" class="tool-btn">Load sample</button>
+          <button id="enc-clear" type="button" class="tool-btn">Clear</button>
+          <button id="enc-copy" type="button" class="tool-btn primary">Copy base64</button>
+          <span class="tool-feedback" id="enc-feedback" role="status" aria-live="polite"></span>
+        </div>
+
+        <details class="tool-details">
+          <summary>Show cURL request</summary>
+          <pre id="enc-curl" class="tool-pre"><code></code></pre>
+        </details>
+      </article>
     </section>
 
   </main>
@@ -775,8 +962,138 @@
     } catch (_) { /* leave hidden */ }
   }
 
+  // --- HTML → Base64 encoder ---------------------------------------------
+  //
+  // btoa() only accepts Latin-1, so we go through TextEncoder for UTF-8.
+  // Iterating in chunks avoids "Maximum call stack size exceeded" on large
+  // inputs (String.fromCharCode.apply has a per-call argument limit).
+  function utf8ToBase64(str) {
+    if (!str) return "";
+    const bytes = new TextEncoder().encode(str);
+    let bin = "";
+    const CHUNK = 0x8000;
+    for (let i = 0; i < bytes.length; i += CHUNK) {
+      bin += String.fromCharCode.apply(null, bytes.subarray(i, i + CHUNK));
+    }
+    return btoa(bin);
+  }
+
+  const SAMPLE_HTML =
+    "<!doctype html>\n" +
+    "<html lang=\"en\">\n" +
+    "<head>\n" +
+    "  <meta charset=\"utf-8\">\n" +
+    "  <title>Sample</title>\n" +
+    "  <style>\n" +
+    "    body { font-family: sans-serif; padding: 40px; color: #222; }\n" +
+    "    h1   { color: #10b981; margin-bottom: 8px; }\n" +
+    "    p    { line-height: 1.55; }\n" +
+    "  </style>\n" +
+    "</head>\n" +
+    "<body>\n" +
+    "  <h1>Hello from DocPipe</h1>\n" +
+    "  <p>Replace this HTML with your own, then copy the base64 on the right.</p>\n" +
+    "</body>\n" +
+    "</html>\n";
+
+  function fmtChars(n) {
+    return (n === 1 ? "1 char" : nf.format(n) + " chars");
+  }
+
+  function setupEncoder() {
+    const inputEl    = $("enc-input");
+    const outputEl   = $("enc-output");
+    const inStats    = $("enc-input-stats");
+    const outStats   = $("enc-output-stats");
+    const feedbackEl = $("enc-feedback");
+    const curlEl     = $("enc-curl").querySelector("code");
+    const sampleBtn  = $("enc-sample");
+    const clearBtn   = $("enc-clear");
+    const copyBtn    = $("enc-copy");
+
+    let feedbackTimer = 0;
+    function setFeedback(msg, isErr) {
+      feedbackEl.textContent = msg;
+      feedbackEl.classList.toggle("err", !!isErr);
+      if (feedbackTimer) clearTimeout(feedbackTimer);
+      feedbackTimer = setTimeout(() => {
+        feedbackEl.textContent = "";
+        feedbackEl.classList.remove("err");
+      }, 2500);
+    }
+
+    function updateCurl(b64) {
+      const origin = (location && location.origin) || "http://localhost:8080";
+      // Single-quoted JSON body — escape any embedded single quotes for the shell.
+      const body = JSON.stringify({ html_base64: b64, filename: "document.pdf" });
+      const shellSafe = body.replace(/'/g, "'\\''");
+      curlEl.textContent =
+        "curl -X POST " + origin + "/v1/convert/html-to-pdf \\\n" +
+        "  -H \"Authorization: Bearer YOUR_API_KEY\" \\\n" +
+        "  -H \"Content-Type: application/json\" \\\n" +
+        "  -d '" + shellSafe + "' \\\n" +
+        "  --output document.pdf";
+    }
+
+    function encodeNow() {
+      const raw = inputEl.value || "";
+      let out = "";
+      try {
+        out = utf8ToBase64(raw);
+      } catch (e) {
+        setFeedback("Encode failed: " + (e && e.message ? e.message : "unknown"), true);
+      }
+      outputEl.value = out;
+      inStats.textContent  = fmtChars(raw.length);
+      outStats.textContent = fmtChars(out.length);
+      updateCurl(out);
+    }
+
+    async function copyEncoded() {
+      const val = outputEl.value;
+      if (!val) { setFeedback("Nothing to copy", true); return; }
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText(val);
+          setFeedback("Copied " + fmtChars(val.length), false);
+          return;
+        }
+        throw new Error("clipboard API unavailable");
+      } catch (e) {
+        // Fallback: select the textarea so the user can press Ctrl/Cmd+C.
+        outputEl.removeAttribute("readonly");
+        outputEl.select();
+        let ok = false;
+        try { ok = document.execCommand("copy"); } catch (_) { /* ignore */ }
+        outputEl.setAttribute("readonly", "");
+        if (ok) {
+          setFeedback("Copied " + fmtChars(val.length), false);
+        } else {
+          setFeedback("Copy blocked — select and copy manually", true);
+        }
+      }
+    }
+
+    inputEl.addEventListener("input", encodeNow);
+    sampleBtn.addEventListener("click", () => {
+      inputEl.value = SAMPLE_HTML;
+      encodeNow();
+      inputEl.focus();
+    });
+    clearBtn.addEventListener("click", () => {
+      inputEl.value = "";
+      encodeNow();
+      inputEl.focus();
+    });
+    copyBtn.addEventListener("click", copyEncoded);
+
+    // Initial render so the cURL block and counts populate.
+    encodeNow();
+  }
+
   document.addEventListener("DOMContentLoaded", () => {
     probeSwagger();
+    setupEncoder();
     tick();
     setInterval(tick, 5000);
     $("refresh-now").addEventListener("click", tick);
