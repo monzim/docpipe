@@ -1,0 +1,150 @@
+# Production compose for DocPipe behind an existing Traefik instance.
+#
+# This file defines only the DocPipe service + its Traefik labels — it does
+# NOT include a Traefik container. Run Traefik separately (or use the one you
+# already have) and join it to the same external docker network.
+#
+# Prerequisites:
+#   1. Traefik is running with:
+#        - an entrypoint named `web` on :80   (HTTP, for redirect)
+#        - an entrypoint named `websecure` on :443 (HTTPS)
+#        - a cert resolver named `letsencrypt` (or override TRAEFIK_CERT_RESOLVER)
+#        - the docker provider enabled
+#   2. An external docker network shared with Traefik:
+#        docker network create traefik
+#
+# Usage:
+#   cp deploy/.env.production.example deploy/.env
+#   $EDITOR deploy/.env                          # set DOMAIN, keys, etc.
+#   docker network create traefik                # if not already
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d
+
+services:
+  docpipe:
+    image: ghcr.io/monzim/docpipe:${DOCPIPE_VERSION:-latest}
+    container_name: ${SERVICE_NAME:-docpipe}
+    restart: unless-stopped
+    # Pull on every `up` so a `latest` tag rotation is honoured. Pin
+    # DOCPIPE_VERSION in .env to lock to a specific release.
+    pull_policy: always
+
+    environment:
+      # See deploy/.env.production.example for the full list with notes.
+      DOCPIPE_API_KEYS: ${DOCPIPE_API_KEYS:-}
+      DOCPIPE_ENV: ${DOCPIPE_ENV:-production}
+      DOCPIPE_LOG_LEVEL: ${DOCPIPE_LOG_LEVEL:-info}
+      DOCPIPE_LOG_FORMAT: ${DOCPIPE_LOG_FORMAT:-json}
+      DOCPIPE_CORS_ORIGINS: ${DOCPIPE_CORS_ORIGINS:-}
+      DOCPIPE_RENDER_CONCURRENCY: ${DOCPIPE_RENDER_CONCURRENCY:-}
+      DOCPIPE_RENDER_TIMEOUT: ${DOCPIPE_RENDER_TIMEOUT:-30s}
+      DOCPIPE_MAX_BODY_BYTES: ${DOCPIPE_MAX_BODY_BYTES:-10485760}
+      DOCPIPE_RATE_LIMIT_RPS: ${DOCPIPE_RATE_LIMIT_RPS:-5}
+      DOCPIPE_RATE_LIMIT_BURST: ${DOCPIPE_RATE_LIMIT_BURST:-10}
+      DOCPIPE_BROWSER_RECYCLE_AFTER: ${DOCPIPE_BROWSER_RECYCLE_AFTER:-500}
+      DOCPIPE_BROWSER_HEALTHCHECK_INTERVAL: ${DOCPIPE_BROWSER_HEALTHCHECK_INTERVAL:-30s}
+      DOCPIPE_SNAPSHOT_INTERVAL: ${DOCPIPE_SNAPSHOT_INTERVAL:-1h}
+      DOCPIPE_DAILY_RETENTION_DAYS: ${DOCPIPE_DAILY_RETENTION_DAYS:-30}
+      DOCPIPE_STATS_PUBLIC: ${DOCPIPE_STATS_PUBLIC:-true}
+      DOCPIPE_ENABLE_SWAGGER: ${DOCPIPE_ENABLE_SWAGGER:-false}
+
+    volumes:
+      # Persists analytics state.json + daily/ rollups + auto-generated
+      # api-keys.json. Bind-mount to a host directory if you want to back it
+      # up out-of-band; the named volume keeps permissions correct otherwise.
+      - docpipe-data:/app/data
+
+    # Chromium scratch space. Harmless with --disable-dev-shm-usage (which
+    # we set in code) but gives headroom if the flag is ever dropped.
+    shm_size: 1gb
+
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+
+    # tini already runs as PID 1 inside the image (see deploy/Dockerfile).
+    # init: true is redundant; keep it off to avoid double-init.
+
+    networks:
+      - traefik
+
+    # Resource ceilings — modern docker compose honours deploy.resources
+    # outside of Swarm mode. Tune to your host. Defaults below are sized for
+    # a small VPS (2 vCPU / 2 GB).
+    deploy:
+      resources:
+        limits:
+          cpus: "${DOCPIPE_CPU_LIMIT:-2}"
+          memory: ${DOCPIPE_MEM_LIMIT:-2g}
+        reservations:
+          cpus: "${DOCPIPE_CPU_RESERVATION:-0.25}"
+          memory: ${DOCPIPE_MEM_RESERVATION:-256m}
+
+    # Cap log volume so a renderer in a recycle loop doesn't fill the host disk.
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "5"
+
+    # Container-level healthcheck. Traefik uses its own (defined in labels)
+    # but this one drives the docker `unless-stopped` restart decision.
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+    labels:
+      # --- Enable Traefik for this container ---
+      traefik.enable: "true"
+      traefik.docker.network: ${TRAEFIK_NETWORK:-traefik}
+
+      # --- HTTPS router ---
+      traefik.http.routers.docpipe.rule: "Host(`${DOMAIN}`)"
+      traefik.http.routers.docpipe.entrypoints: ${TRAEFIK_ENTRYPOINT_SECURE:-websecure}
+      traefik.http.routers.docpipe.tls: "true"
+      traefik.http.routers.docpipe.tls.certresolver: ${TRAEFIK_CERT_RESOLVER:-letsencrypt}
+      traefik.http.routers.docpipe.service: docpipe
+      traefik.http.routers.docpipe.middlewares: docpipe-security,docpipe-compress
+
+      # --- HTTP → HTTPS redirect router ---
+      traefik.http.routers.docpipe-http.rule: "Host(`${DOMAIN}`)"
+      traefik.http.routers.docpipe-http.entrypoints: ${TRAEFIK_ENTRYPOINT_INSECURE:-web}
+      traefik.http.routers.docpipe-http.middlewares: docpipe-https-redirect
+
+      # --- Service: where Traefik forwards traffic ---
+      traefik.http.services.docpipe.loadbalancer.server.port: "8080"
+      traefik.http.services.docpipe.loadbalancer.healthcheck.path: "/healthz"
+      traefik.http.services.docpipe.loadbalancer.healthcheck.interval: "30s"
+      traefik.http.services.docpipe.loadbalancer.healthcheck.timeout: "5s"
+      # Sticky sessions are intentionally OFF — DocPipe is stateless across
+      # requests, so any instance can serve any caller.
+
+      # --- Middleware: HTTPS redirect ---
+      traefik.http.middlewares.docpipe-https-redirect.redirectscheme.scheme: "https"
+      traefik.http.middlewares.docpipe-https-redirect.redirectscheme.permanent: "true"
+
+      # --- Middleware: security headers ---
+      # HSTS, click-jacking, MIME-sniff, referrer policy. Adjust to your needs.
+      traefik.http.middlewares.docpipe-security.headers.framedeny: "true"
+      traefik.http.middlewares.docpipe-security.headers.contenttypenosniff: "true"
+      traefik.http.middlewares.docpipe-security.headers.browserxssfilter: "true"
+      traefik.http.middlewares.docpipe-security.headers.referrerpolicy: "strict-origin-when-cross-origin"
+      traefik.http.middlewares.docpipe-security.headers.stsseconds: "31536000"
+      traefik.http.middlewares.docpipe-security.headers.stsincludesubdomains: "true"
+      traefik.http.middlewares.docpipe-security.headers.stspreload: "true"
+
+      # --- Middleware: response compression ---
+      # PDFs are already compressed; JSON responses (stats, error envelopes,
+      # JSON-wrapped PDFs) benefit substantially.
+      traefik.http.middlewares.docpipe-compress.compress: "true"
+
+volumes:
+  docpipe-data:
+    name: ${DATA_VOLUME_NAME:-docpipe-data}
+
+networks:
+  traefik:
+    external: true
+    name: ${TRAEFIK_NETWORK:-traefik}
