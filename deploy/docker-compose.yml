@@ -1,0 +1,29 @@
+# DocPipe local development & smoke compose.
+#
+# For production deploys, mount /app/data as a bind to a host directory or
+# persistent volume so the analytics snapshot survives container replacement.
+services:
+  docpipe:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile
+    image: docpipe:local
+    ports:
+      - "8080:8080"
+    env_file:
+      - ../.env
+    volumes:
+      - ../data:/app/data
+    restart: unless-stopped
+    # shm_size is harmless when paired with --disable-dev-shm-usage but gives
+    # Chrome headroom if that flag is ever dropped.
+    shm_size: 1gb
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:8080/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s

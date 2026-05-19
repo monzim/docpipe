@@ -1,0 +1,417 @@
+openapi: 3.1.0
+info:
+  title: DocPipe
+  version: 2.0.0
+  summary: HTML → PDF rendering service with public analytics.
+  description: |
+    DocPipe converts HTML to PDF using a long-lived headless Chromium pool.
+    Synchronous request/response — submit HTML, receive PDF bytes (or a JSON
+    envelope on demand).
+
+    Authentication is via API key. Public analytics live at `/v1/stats` and
+    `/v1/stats/dashboard` (no auth by default).
+  contact:
+    name: monzim
+  license:
+    name: Proprietary
+servers:
+  - url: https://docpipe.example.com
+    description: Production
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: Convert
+    description: HTML → PDF conversion
+  - name: Stats
+    description: Public observability surface
+  - name: Health
+    description: Liveness and readiness
+  - name: Legacy
+    description: Backwards compatibility — slated for removal
+
+paths:
+  /v1/convert/html-to-pdf:
+    post:
+      tags: [Convert]
+      summary: Convert HTML to PDF
+      operationId: convertHTMLToPDF
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConvertRequest'
+            examples:
+              a4-portrait:
+                summary: A4 portrait, default options
+                value:
+                  html: "<!doctype html><html><body><h1>Hello</h1></body></html>"
+                  filename: hello.pdf
+                  options:
+                    format: A4
+              letter-landscape:
+                summary: US Letter landscape with custom margins
+                value:
+                  html: "<!doctype html><html><body><h1>Report</h1></body></html>"
+                  filename: report.pdf
+                  options:
+                    format: Letter
+                    landscape: true
+                    margin:
+                      top: 12mm
+                      bottom: 12mm
+                      left: 10mm
+                      right: 10mm
+              base64-input-and-output:
+                summary: Send base64-encoded HTML, request JSON-wrapped PDF
+                value:
+                  html_base64: "PCFkb2N0eXBlIGh0bWw+PGgxPmhpPC9oMT4="
+                  filename: hi.pdf
+      responses:
+        '200':
+          description: Successful render
+          content:
+            application/pdf:
+              schema:
+                type: string
+                format: binary
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConvertJSONResponse'
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '415':
+          $ref: '#/components/responses/UnsupportedMedia'
+        '429':
+          $ref: '#/components/responses/RateLimited'
+        '500':
+          $ref: '#/components/responses/ServerError'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+        '504':
+          $ref: '#/components/responses/Timeout'
+
+  /api/html-to-pdf:
+    post:
+      tags: [Legacy]
+      summary: Legacy v1 HTML→PDF endpoint (deprecated)
+      operationId: legacyConvert
+      deprecated: true
+      description: |
+        Backwards-compatible endpoint preserved for the CASCK job portal.
+        Accepts the v1 payload (`base64_html`) and returns a PDF with the
+        legacy filename `admit_card.pdf`.
+
+        Migrate to `/v1/convert/html-to-pdf`.
+      security:
+        - bearerAuth: []
+        - apiKeyHeader: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [base64_html]
+              properties:
+                base64_html:
+                  type: string
+                  description: Base64-encoded HTML
+      responses:
+        '200':
+          description: PDF bytes
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '400':
+          $ref: '#/components/responses/InvalidRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /v1/stats:
+    get:
+      tags: [Stats]
+      summary: Public service statistics
+      description: |
+        Redacted observability snapshot. Excludes per-key counts, key names,
+        request IDs, client IPs, and hostnames.
+
+        Public by default. Set `DOCPIPE_STATS_PUBLIC=false` to require auth.
+      operationId: getStats
+      responses:
+        '200':
+          description: Snapshot of service health and counters
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PublicStats'
+
+  /v1/stats/dashboard:
+    get:
+      tags: [Stats]
+      summary: Embedded HTML dashboard
+      description: Single-page dashboard that polls /v1/stats every 5 seconds.
+      operationId: getStatsDashboard
+      responses:
+        '200':
+          description: HTML page
+          content:
+            text/html:
+              schema: { type: string }
+
+  /healthz:
+    get:
+      tags: [Health]
+      summary: Liveness probe
+      operationId: getHealthz
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusOK' }
+
+  /readyz:
+    get:
+      tags: [Health]
+      summary: Readiness probe
+      description: 200 if the headless browser is responsive, 503 otherwise.
+      operationId: getReadyz
+      responses:
+        '200':
+          description: ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusOK' }
+        '503':
+          description: not ready
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/StatusOK' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'Provide your API key as `Authorization: Bearer <key>`.'
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: 'Alternative to bearer. Same key value.'
+
+  responses:
+    InvalidRequest:
+      description: Bad request payload
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Unauthorized:
+      description: Missing API key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Forbidden:
+      description: Valid format but unknown key
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    PayloadTooLarge:
+      description: Body exceeds DOCPIPE_MAX_BODY_BYTES
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    UnsupportedMedia:
+      description: Content-Type must be application/json
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    RateLimited:
+      description: Rate limit exceeded for API key
+      headers:
+        Retry-After:
+          schema: { type: integer }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ServerError:
+      description: Render failed
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    ServiceUnavailable:
+      description: Browser unhealthy
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+    Timeout:
+      description: Render exceeded timeout
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+
+  schemas:
+    ConvertRequest:
+      type: object
+      properties:
+        html:
+          type: string
+          description: Raw HTML. Mutually exclusive with html_base64.
+        html_base64:
+          type: string
+          description: Base64-encoded HTML. Mutually exclusive with html.
+        filename:
+          type: string
+          description: Filename used in Content-Disposition.
+          default: document.pdf
+        options:
+          $ref: '#/components/schemas/PDFOptions'
+      oneOf:
+        - required: [html]
+        - required: [html_base64]
+    PDFOptions:
+      type: object
+      properties:
+        format: { type: string, enum: [A3, A4, A5, Letter, Legal], default: A4 }
+        landscape: { type: boolean, default: false }
+        scale: { type: number, minimum: 0.1, maximum: 2.0, default: 1.0 }
+        print_background: { type: boolean, default: true }
+        prefer_css_page_size: { type: boolean, default: false }
+        margin:
+          type: object
+          properties:
+            top: { type: string, example: "10mm" }
+            right: { type: string, example: "10mm" }
+            bottom: { type: string, example: "10mm" }
+            left: { type: string, example: "10mm" }
+        header_template: { type: string }
+        footer_template: { type: string }
+        display_header_footer: { type: boolean, default: false }
+        page_ranges: { type: string, example: "1-3,5" }
+        wait:
+          type: object
+          properties:
+            strategy: { type: string, enum: [load, networkidle, selector, none], default: networkidle }
+            timeout_ms: { type: integer, minimum: 0, default: 15000 }
+            selector: { type: string, nullable: true }
+    ConvertJSONResponse:
+      type: object
+      properties:
+        filename: { type: string }
+        size_bytes: { type: integer }
+        pdf_base64: { type: string }
+        duration_ms: { type: integer }
+        request_id: { type: string }
+    ErrorEnvelope:
+      type: object
+      required: [error]
+      properties:
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              enum:
+                - invalid_request
+                - invalid_base64
+                - unauthorized
+                - forbidden
+                - payload_too_large
+                - rate_limited
+                - render_timeout
+                - render_failed
+                - service_unavailable
+                - internal_error
+                - method_not_allowed
+                - unsupported_media_type
+            message: { type: string }
+            request_id: { type: string }
+            details: { type: object, additionalProperties: true }
+    StatusOK:
+      type: object
+      properties:
+        status: { type: string }
+    PublicStats:
+      type: object
+      properties:
+        service:
+          type: object
+          properties:
+            name: { type: string }
+            version: { type: string }
+            started_at: { type: string, format: date-time }
+            uptime_seconds: { type: integer }
+            status: { type: string }
+        totals:
+          type: object
+          properties:
+            requests: { type: integer }
+            pdfs_generated: { type: integer }
+            failures: { type: integer }
+            success_rate: { type: number }
+            bytes_in: { type: integer }
+            bytes_out: { type: integer }
+            pdf_pages_estimated: { type: integer }
+        latency_ms:
+          type: object
+          properties:
+            p50: { type: integer }
+            p90: { type: integer }
+            p95: { type: integer }
+            p99: { type: integer }
+            mean: { type: integer }
+            max: { type: integer }
+        throughput:
+          type: object
+          properties:
+            current_rps: { type: number }
+            peak_rps_1m: { type: number }
+            peak_rps_5m: { type: number }
+            peak_rps_all_time: { type: number }
+            peak_rps_at: { type: string, format: date-time }
+        concurrency:
+          type: object
+          properties:
+            max_configured: { type: integer }
+            current_in_flight: { type: integer }
+            peak_in_flight: { type: integer }
+        browser:
+          type: object
+          properties:
+            healthy: { type: boolean }
+            restarts: { type: integer }
+            last_restart_at: { type: string, format: date-time }
+            last_restart_reason: { type: string }
+        windows:
+          type: object
+          properties:
+            last_1h: { $ref: '#/components/schemas/Window' }
+            last_24h: { $ref: '#/components/schemas/Window' }
+        failures_by_reason:
+          type: object
+          additionalProperties: { type: integer }
+        snapshot:
+          type: object
+          properties:
+            last_persisted_at: { type: string, format: date-time }
+            next_persist_at: { type: string, format: date-time }
+    Window:
+      type: object
+      properties:
+        requests: { type: integer }
+        pdfs: { type: integer }
+        failures: { type: integer }
+        p95_ms: { type: integer }
+        coverage_seconds: { type: integer }

@@ -1,0 +1,263 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>DocPipe — live</title>
+  <style>
+    :root {
+      --bg: #0b0f14;
+      --panel: #121821;
+      --panel-2: #1a2230;
+      --text: #e6edf3;
+      --muted: #8693a4;
+      --accent: #6ee7b7;
+      --warn: #fbbf24;
+      --danger: #f87171;
+      --border: #1f2937;
+      --mono: "JetBrains Mono", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
+      --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+    @media (prefers-color-scheme: light) {
+      :root {
+        --bg: #f7fafc;
+        --panel: #ffffff;
+        --panel-2: #f1f5f9;
+        --text: #0b1220;
+        --muted: #475569;
+        --accent: #047857;
+        --warn: #b45309;
+        --danger: #b91c1c;
+        --border: #e2e8f0;
+      }
+    }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+    .wrap { max-width: 1100px; margin: 0 auto; padding: 32px 24px 64px; }
+
+    header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
+    header h1 { font-size: 22px; font-weight: 600; letter-spacing: -0.01em; margin: 0; }
+    header .meta { font-family: var(--mono); font-size: 12px; color: var(--muted); }
+    .pill { display: inline-flex; align-items: center; gap: 8px; padding: 4px 10px; border: 1px solid var(--border); border-radius: 999px; font-family: var(--mono); font-size: 12px; }
+    .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); }
+    .dot.warn { background: var(--warn); }
+    .dot.bad { background: var(--danger); }
+
+    .grid { display: grid; gap: 16px; }
+    .grid.cols-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+    .grid.cols-2 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    @media (max-width: 800px) {
+      .grid.cols-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .grid.cols-2 { grid-template-columns: 1fr; }
+    }
+
+    .card { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
+    .card h2 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: var(--muted); font-weight: 500; margin: 0 0 12px; }
+    .number { font-family: var(--mono); font-size: 30px; font-weight: 600; letter-spacing: -0.02em; }
+    .number small { font-size: 14px; color: var(--muted); margin-left: 8px; font-weight: 400; }
+    .stat { display: flex; justify-content: space-between; align-items: baseline; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+    .stat:last-child { border-bottom: none; }
+    .stat .k { color: var(--muted); font-size: 13px; }
+    .stat .v { font-family: var(--mono); font-size: 14px; }
+
+    table { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+    th, td { text-align: left; padding: 8px 0; border-bottom: 1px dashed var(--border); }
+    th { color: var(--muted); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.06em; }
+    td.r, th.r { text-align: right; }
+
+    footer { margin-top: 32px; font-family: var(--mono); font-size: 11px; color: var(--muted); display: flex; justify-content: space-between; }
+    a { color: inherit; }
+    .err { color: var(--danger); }
+    .coverage { color: var(--muted); font-size: 11px; margin-top: 4px; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>DocPipe <span class="meta" id="version"></span></h1>
+    <div class="meta">
+      <span class="pill"><span class="dot" id="dot"></span><span id="status">connecting…</span></span>
+      <span id="uptime" style="margin-left:8px"></span>
+    </div>
+  </header>
+
+  <section class="grid cols-4" style="margin-bottom: 20px;">
+    <div class="card">
+      <h2>Requests</h2>
+      <div class="number" id="reqs">—</div>
+    </div>
+    <div class="card">
+      <h2>PDFs</h2>
+      <div class="number" id="pdfs">—</div>
+    </div>
+    <div class="card">
+      <h2>Success</h2>
+      <div class="number" id="success">—</div>
+    </div>
+    <div class="card">
+      <h2>Now</h2>
+      <div class="number"><span id="rps">—</span><small>r/s</small></div>
+    </div>
+  </section>
+
+  <section class="grid cols-2" style="margin-bottom: 20px;">
+    <div class="card">
+      <h2>Latency</h2>
+      <div class="stat"><span class="k">p50</span><span class="v" id="p50">— ms</span></div>
+      <div class="stat"><span class="k">p90</span><span class="v" id="p90">— ms</span></div>
+      <div class="stat"><span class="k">p95</span><span class="v" id="p95">— ms</span></div>
+      <div class="stat"><span class="k">p99</span><span class="v" id="p99">— ms</span></div>
+      <div class="stat"><span class="k">max</span><span class="v" id="lmax">— ms</span></div>
+    </div>
+    <div class="card">
+      <h2>Throughput</h2>
+      <div class="stat"><span class="k">now</span><span class="v"><span id="t_now">—</span> r/s</span></div>
+      <div class="stat"><span class="k">peak 1m</span><span class="v"><span id="t_1m">—</span> r/s</span></div>
+      <div class="stat"><span class="k">peak 5m</span><span class="v"><span id="t_5m">—</span> r/s</span></div>
+      <div class="stat"><span class="k">peak all-time</span><span class="v"><span id="t_all">—</span> r/s <small id="t_all_at" style="margin-left:8px;color:var(--muted)"></small></span></div>
+      <div class="stat"><span class="k">concurrency</span><span class="v"><span id="conc">—</span>/<span id="conc_max">—</span> tabs</span></div>
+    </div>
+  </section>
+
+  <section class="grid cols-2" style="margin-bottom: 20px;">
+    <div class="card">
+      <h2>Last 24h</h2>
+      <div class="stat"><span class="k">requests</span><span class="v" id="w24_req">—</span></div>
+      <div class="stat"><span class="k">pdfs</span><span class="v" id="w24_pdf">—</span></div>
+      <div class="stat"><span class="k">failures</span><span class="v" id="w24_fail">—</span></div>
+      <div class="stat"><span class="k">p95</span><span class="v" id="w24_p95">— ms</span></div>
+      <div class="coverage" id="w24_cov"></div>
+    </div>
+    <div class="card">
+      <h2>Failures by reason</h2>
+      <table id="fail_tbl">
+        <thead><tr><th>reason</th><th class="r">count</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div class="coverage" id="fail_empty"></div>
+    </div>
+  </section>
+
+  <section class="card" style="margin-bottom: 20px;">
+    <h2>Browser</h2>
+    <div class="grid cols-4">
+      <div class="stat"><span class="k">health</span><span class="v" id="b_health">—</span></div>
+      <div class="stat"><span class="k">restarts</span><span class="v" id="b_restarts">—</span></div>
+      <div class="stat"><span class="k">last restart</span><span class="v" id="b_last">—</span></div>
+      <div class="stat"><span class="k">reason</span><span class="v" id="b_reason">—</span></div>
+    </div>
+  </section>
+
+  <footer>
+    <span>refreshed <span id="refreshed">never</span></span>
+    <span>polls <code>/v1/stats</code> every 5s</span>
+  </footer>
+</div>
+
+<script>
+(function () {
+  const $ = id => document.getElementById(id);
+  const fmt = n => (n == null ? "—" : n.toLocaleString());
+  const pct = n => (n == null ? "—" : (n * 100).toFixed(2) + "%");
+  const ms = n => (n == null ? "— ms" : n.toLocaleString() + " ms");
+  const fmtUptime = sec => {
+    if (sec == null) return "";
+    const d = Math.floor(sec / 86400);
+    const h = Math.floor((sec % 86400) / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    if (d) return "up " + d + "d " + h + "h";
+    if (h) return "up " + h + "h " + m + "m";
+    return "up " + m + "m";
+  };
+  const fmtCoverage = sec => {
+    if (sec == null || sec <= 0) return "based on no data yet";
+    if (sec >= 3600) return "based on " + Math.floor(sec / 3600) + "h " + Math.floor((sec % 3600) / 60) + "m";
+    if (sec >= 60) return "based on " + Math.floor(sec / 60) + "m of data";
+    return "based on " + sec + "s of data";
+  };
+
+  async function tick() {
+    try {
+      const r = await fetch("/v1/stats", { cache: "no-store" });
+      if (!r.ok) throw new Error("HTTP " + r.status);
+      const s = await r.json();
+      apply(s);
+      $("status").textContent = (s.service && s.service.status) || "ok";
+      $("status").classList.remove("err");
+      $("dot").className = "dot" + (s.browser && !s.browser.healthy ? " bad" : "");
+    } catch (e) {
+      $("status").textContent = "offline: " + e.message;
+      $("status").classList.add("err");
+      $("dot").className = "dot bad";
+    }
+    $("refreshed").textContent = new Date().toLocaleTimeString();
+  }
+
+  // Build a single <tr> with createElement + textContent so all rendered
+  // values are treated as text (no HTML parsing path, no XSS risk).
+  function failureRow(reason, count) {
+    const tr = document.createElement("tr");
+    const td1 = document.createElement("td");
+    td1.textContent = reason;
+    const td2 = document.createElement("td");
+    td2.className = "r";
+    td2.textContent = fmt(count);
+    tr.appendChild(td1);
+    tr.appendChild(td2);
+    return tr;
+  }
+
+  function apply(s) {
+    $("version").textContent = "v" + ((s.service && s.service.version) || "?");
+    $("uptime").textContent = fmtUptime(s.service && s.service.uptime_seconds);
+
+    $("reqs").textContent = fmt(s.totals.requests);
+    $("pdfs").textContent = fmt(s.totals.pdfs_generated);
+    $("success").textContent = pct(s.totals.success_rate);
+    $("rps").textContent = (s.throughput.current_rps || 0).toFixed(1);
+
+    $("p50").textContent = ms(s.latency_ms.p50);
+    $("p90").textContent = ms(s.latency_ms.p90);
+    $("p95").textContent = ms(s.latency_ms.p95);
+    $("p99").textContent = ms(s.latency_ms.p99);
+    $("lmax").textContent = ms(s.latency_ms.max);
+
+    $("t_now").textContent = (s.throughput.current_rps || 0).toFixed(1);
+    $("t_1m").textContent = (s.throughput.peak_rps_1m || 0).toFixed(1);
+    $("t_5m").textContent = (s.throughput.peak_rps_5m || 0).toFixed(1);
+    $("t_all").textContent = (s.throughput.peak_rps_all_time || 0).toFixed(1);
+    if (s.throughput.peak_rps_at && s.throughput.peak_rps_at !== "0001-01-01T00:00:00Z") {
+      $("t_all_at").textContent = "(" + new Date(s.throughput.peak_rps_at).toLocaleString() + ")";
+    } else {
+      $("t_all_at").textContent = "";
+    }
+
+    $("conc").textContent = s.concurrency.current_in_flight;
+    $("conc_max").textContent = s.concurrency.max_configured;
+
+    const w24 = s.windows.last_24h || {};
+    $("w24_req").textContent = fmt(w24.requests);
+    $("w24_pdf").textContent = fmt(w24.pdfs);
+    $("w24_fail").textContent = fmt(w24.failures);
+    $("w24_p95").textContent = ms(w24.p95_ms);
+    $("w24_cov").textContent = fmtCoverage(w24.coverage_seconds);
+
+    const tbody = $("fail_tbl").querySelector("tbody");
+    const fails = s.failures_by_reason || {};
+    const keys = Object.keys(fails).sort((a, b) => fails[b] - fails[a]);
+    const rows = keys.map(k => failureRow(k, fails[k]));
+    tbody.replaceChildren(...rows);
+    $("fail_empty").textContent = keys.length === 0 ? "no failures recorded" : "";
+
+    $("b_health").textContent = s.browser.healthy ? "healthy" : "unhealthy";
+    $("b_restarts").textContent = fmt(s.browser.restarts);
+    $("b_last").textContent = s.browser.last_restart_at ? new Date(s.browser.last_restart_at).toLocaleString() : "never";
+    $("b_reason").textContent = s.browser.last_restart_reason || "—";
+  }
+
+  tick();
+  setInterval(tick, 5000);
+})();
+</script>
+</body>
+</html>

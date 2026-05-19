@@ -1,0 +1,33 @@
+# Authoritative Chrome flag list — mirrored from internal/render/browser.go.
+# This file is for grep-ability and operator reference; the binary reads
+# flags from the code, not from this file.
+#
+# Source of truth: project-specification.md §8.2.
+#
+# If you change flags in browser.go, mirror them here. If they drift,
+# trust the .go file — the runtime won't read this.
+
+--headless=new
+--no-sandbox                       # required in Alpine container, OK with non-root user + cap_drop
+--disable-gpu
+--disable-dev-shm-usage            # critical — /dev/shm is tiny in containers
+--disable-software-rasterizer
+--disable-background-networking
+--disable-background-timer-throttling
+--disable-backgrounding-occluded-windows
+--disable-breakpad
+--disable-extensions
+--disable-features=TranslateUI,IsolateOrigins,site-per-process
+--disable-ipc-flooding-protection
+--disable-renderer-backgrounding
+--disable-sync
+--enable-features=NetworkService
+--force-color-profile=srgb
+--hide-scrollbars
+--metrics-recording-only
+--mute-audio
+--no-default-browser-check
+--no-first-run
+--password-store=basic
+--use-mock-keychain
+--font-render-hinting=none

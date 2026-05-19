@@ -1,0 +1,33 @@
+# Build artefacts
+/docpipe
+/cmd/docpipe/docpipe
+/dist/
+/bin/
+
+# Runtime state — analytics snapshots + daily rollups
+/data/*.json
+/data/*.json.tmp
+/data/*.json.broken.*
+/data/daily/
+
+# Environment files
+.env
+.env.local
+.env.*.local
+
+# Editor noise
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS noise
+.DS_Store
+Thumbs.db
+
+# Test coverage
+coverage.out
+coverage.html
+
+# Soak / benchmark output
+/soak-results/

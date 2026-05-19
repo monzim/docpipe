@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>CSS @page rules</title>
+  <style>
+    @page { size: A4; margin: 12mm 10mm; }
+    @page :first { margin-top: 24mm; }
+    body { font-family: "Noto Sans", sans-serif; }
+    .page-break { page-break-after: always; }
+    h1 { color: #047857; }
+  </style>
+</head>
+<body>
+  <h1>Document with @page rules</h1>
+  <p>First page with extra top margin.</p>
+  <div class="page-break"></div>
+  <h2>Second page</h2>
+  <p>Standard margins.</p>
+  <div class="page-break"></div>
+  <h2>Third page</h2>
+  <p>Tests page_ranges options downstream.</p>
+</body>
+</html>
