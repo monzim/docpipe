@@ -176,10 +176,18 @@ func run() error {
 
 			// Swagger UI — dev-facing, gated by config.
 			if cfg.EnableSwagger {
-				r.Get("/swagger", handlers.SwaggerUI)
-				r.Get("/swagger/", handlers.SwaggerUI)
-				r.Get("/swagger/openapi.yaml", handlers.SwaggerSpec)
-				log.Info("swagger_ui_enabled", "path", "/swagger/")
+				swagger, err := handlers.NewSwaggerHandler(cfg.SwaggerServers)
+				if err != nil {
+					log.Error("swagger_handler_build_failed", "err", err)
+				} else {
+					r.Get("/swagger", swagger.UI)
+					r.Get("/swagger/", swagger.UI)
+					r.Get("/swagger/openapi.yaml", swagger.Spec)
+					log.Info("swagger_ui_enabled",
+						"path", "/swagger/",
+						"extra_servers", len(cfg.SwaggerServers),
+					)
+				}
 			}
 		}),
 	)

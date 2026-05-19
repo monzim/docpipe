@@ -181,6 +181,7 @@ All settings come from environment variables — see [`.env.example`](./.env.exa
 | `DOCPIPE_SNAPSHOT_INTERVAL` | `1h` | Analytics persistence cadence |
 | `DOCPIPE_STATS_PUBLIC` | `true` | Toggle public stats |
 | `DOCPIPE_ENABLE_SWAGGER` | `false` | Force-enable Swagger UI in production |
+| `DOCPIPE_SWAGGER_SERVERS` | *(empty)* | Extra servers for the Swagger UI dropdown, prepended to the YAML defaults. Format: comma-separated `URL[\|Description]`. |
 
 ---
 

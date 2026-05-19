@@ -39,6 +39,7 @@ const (
 	envDailyRetention      = "DOCPIPE_DAILY_RETENTION_DAYS"
 	envEnableSwagger       = "DOCPIPE_ENABLE_SWAGGER"
 	envStatsPublic         = "DOCPIPE_STATS_PUBLIC"
+	envSwaggerServers      = "DOCPIPE_SWAGGER_SERVERS"
 )
 
 // Environment names. `development` enables verbose logs and Swagger UI by default.
@@ -82,8 +83,17 @@ type Config struct {
 	SnapshotInterval   time.Duration
 	DailyRetentionDays int
 
-	EnableSwagger bool
-	StatsPublic   bool
+	EnableSwagger  bool
+	StatsPublic    bool
+	SwaggerServers []SwaggerServer
+}
+
+// SwaggerServer is one entry in the OpenAPI `servers:` list, surfaced in
+// the Swagger UI's "Servers" dropdown so users can pick where to send
+// "Try it out" requests.
+type SwaggerServer struct {
+	URL         string
+	Description string
 }
 
 // Load reads configuration from the process environment and validates it.
@@ -125,6 +135,12 @@ func Load() (*Config, error) {
 	c.DailyRetentionDays = envInt(envDailyRetention, 30, &errs)
 	c.EnableSwagger = envBool(envEnableSwagger, c.Env == EnvDevelopment, &errs)
 	c.StatsPublic = envBool(envStatsPublic, true, &errs)
+
+	servers, srvErr := parseSwaggerServers(os.Getenv(envSwaggerServers))
+	if srvErr != nil {
+		errs = append(errs, srvErr.Error())
+	}
+	c.SwaggerServers = servers
 
 	// Cross-field validation.
 	switch c.LogLevel {
@@ -175,6 +191,40 @@ func (c *Config) Addr() string {
 
 // IsDevelopment reports whether DOCPIPE_ENV is "development".
 func (c *Config) IsDevelopment() bool { return c.Env == EnvDevelopment }
+
+// parseSwaggerServers parses the DOCPIPE_SWAGGER_SERVERS env var.
+//
+// Format: comma-separated list of `URL` or `URL|Description` entries.
+//
+//	https://prod.example.com|Production,https://staging.example.com|Staging
+//	https://prod.example.com,https://staging.example.com    (no descriptions)
+//
+// Empty input returns nil (use YAML defaults). Bad entries error so a typo
+// at startup fails loudly instead of silently dropping a server.
+func parseSwaggerServers(raw string) ([]SwaggerServer, error) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return nil, nil
+	}
+	var out []SwaggerServer
+	for i, entry := range strings.Split(raw, ",") {
+		entry = strings.TrimSpace(entry)
+		if entry == "" {
+			continue
+		}
+		url, desc, _ := strings.Cut(entry, "|")
+		url = strings.TrimSpace(url)
+		desc = strings.TrimSpace(desc)
+		if url == "" {
+			return nil, fmt.Errorf("%s entry #%d has empty URL", envSwaggerServers, i+1)
+		}
+		if !strings.HasPrefix(url, "http://") && !strings.HasPrefix(url, "https://") {
+			return nil, fmt.Errorf("%s entry #%d URL %q must start with http:// or https://", envSwaggerServers, i+1, url)
+		}
+		out = append(out, SwaggerServer{URL: url, Description: desc})
+	}
+	return out, nil
+}
 
 // parseAPIKeys parses a comma-separated list of `name:secret` pairs.
 // Returns an error only for malformed input — empty is now a valid signal to

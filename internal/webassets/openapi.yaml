@@ -15,7 +15,10 @@ info:
   license:
     name: Proprietary
 servers:
-  - url: https://docpipe.example.com
+  # These are defaults. Additional servers can be PREPENDED at runtime via
+  # the DOCPIPE_SWAGGER_SERVERS env var (comma-separated `URL|Description`).
+  # See deploy/.env.production.example for the format.
+  - url: https://docpipe.services.monzim.com
     description: Production
   - url: http://localhost:8080
     description: Local development

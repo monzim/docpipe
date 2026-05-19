@@ -120,6 +120,54 @@ func TestParseAPIKeys(t *testing.T) {
 	}
 }
 
+func TestParseSwaggerServers(t *testing.T) {
+	cases := []struct {
+		name    string
+		in      string
+		want    []SwaggerServer
+		wantErr string
+	}{
+		{"empty", "", nil, ""},
+		{"single URL only", "https://prod.example.com", []SwaggerServer{
+			{URL: "https://prod.example.com"},
+		}, ""},
+		{"URL with description", "https://prod.example.com|Production", []SwaggerServer{
+			{URL: "https://prod.example.com", Description: "Production"},
+		}, ""},
+		{"multiple mixed", "https://prod.example.com|Production,https://staging.example.com", []SwaggerServer{
+			{URL: "https://prod.example.com", Description: "Production"},
+			{URL: "https://staging.example.com"},
+		}, ""},
+		{"missing scheme", "prod.example.com", nil, "http://"},
+		{"empty URL", "|Production", nil, "empty URL"},
+		{"whitespace tolerated", " https://prod.example.com | Production ", []SwaggerServer{
+			{URL: "https://prod.example.com", Description: "Production"},
+		}, ""},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			got, err := parseSwaggerServers(tc.in)
+			if tc.wantErr != "" {
+				if err == nil || !strings.Contains(err.Error(), tc.wantErr) {
+					t.Fatalf("want error containing %q, got %v", tc.wantErr, err)
+				}
+				return
+			}
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(got) != len(tc.want) {
+				t.Fatalf("len mismatch: got %d want %d (%v)", len(got), len(tc.want), got)
+			}
+			for i, w := range tc.want {
+				if got[i] != w {
+					t.Errorf("[%d]: got %+v want %+v", i, got[i], w)
+				}
+			}
+		})
+	}
+}
+
 func TestParseList(t *testing.T) {
 	got := parseList(" a, b ,, c ,")
 	want := []string{"a", "b", "c"}
