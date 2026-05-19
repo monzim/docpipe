@@ -28,24 +28,40 @@ services:
     # DOCPIPE_VERSION in .env to lock to a specific release.
     pull_policy: always
 
-    environment:
-      # See deploy/.env.production.example for the full list with notes.
-      DOCPIPE_API_KEYS: ${DOCPIPE_API_KEYS:-}
-      DOCPIPE_ENV: ${DOCPIPE_ENV:-production}
-      DOCPIPE_LOG_LEVEL: ${DOCPIPE_LOG_LEVEL:-info}
-      DOCPIPE_LOG_FORMAT: ${DOCPIPE_LOG_FORMAT:-json}
-      DOCPIPE_CORS_ORIGINS: ${DOCPIPE_CORS_ORIGINS:-}
-      DOCPIPE_RENDER_CONCURRENCY: ${DOCPIPE_RENDER_CONCURRENCY:-}
-      DOCPIPE_RENDER_TIMEOUT: ${DOCPIPE_RENDER_TIMEOUT:-30s}
-      DOCPIPE_MAX_BODY_BYTES: ${DOCPIPE_MAX_BODY_BYTES:-10485760}
-      DOCPIPE_RATE_LIMIT_RPS: ${DOCPIPE_RATE_LIMIT_RPS:-5}
-      DOCPIPE_RATE_LIMIT_BURST: ${DOCPIPE_RATE_LIMIT_BURST:-10}
-      DOCPIPE_BROWSER_RECYCLE_AFTER: ${DOCPIPE_BROWSER_RECYCLE_AFTER:-500}
-      DOCPIPE_BROWSER_HEALTHCHECK_INTERVAL: ${DOCPIPE_BROWSER_HEALTHCHECK_INTERVAL:-30s}
-      DOCPIPE_SNAPSHOT_INTERVAL: ${DOCPIPE_SNAPSHOT_INTERVAL:-1h}
-      DOCPIPE_DAILY_RETENTION_DAYS: ${DOCPIPE_DAILY_RETENTION_DAYS:-30}
-      DOCPIPE_STATS_PUBLIC: ${DOCPIPE_STATS_PUBLIC:-true}
-      DOCPIPE_ENABLE_SWAGGER: ${DOCPIPE_ENABLE_SWAGGER:-false}
+    # Load deploy/.env directly into the container's environment. Path is
+    # relative to this compose file, so `.env` resolves to deploy/.env.
+    #
+    # Vars the binary doesn't know about (DOMAIN, TRAEFIK_*, DOCPIPE_VERSION,
+    # the resource-limit knobs) are harmlessly ignored — config.Load only
+    # reads the DOCPIPE_* names it recognises.
+    env_file:
+      - .env
+
+    # The explicit `environment:` block below is intentionally commented out:
+    # env_file above already passes everything from deploy/.env into the
+    # container, so duplicating the names here would create two places to
+    # keep in sync.
+    #
+    # Uncomment a single line if you ever need to hard-pin a value FROM the
+    # compose file (overrides whatever .env says — useful for ad-hoc tests):
+    #
+    # environment:
+    #   DOCPIPE_API_KEYS: ${DOCPIPE_API_KEYS:-}
+    #   DOCPIPE_ENV: ${DOCPIPE_ENV:-production}
+    #   DOCPIPE_LOG_LEVEL: ${DOCPIPE_LOG_LEVEL:-info}
+    #   DOCPIPE_LOG_FORMAT: ${DOCPIPE_LOG_FORMAT:-json}
+    #   DOCPIPE_CORS_ORIGINS: ${DOCPIPE_CORS_ORIGINS:-}
+    #   DOCPIPE_RENDER_CONCURRENCY: ${DOCPIPE_RENDER_CONCURRENCY:-}
+    #   DOCPIPE_RENDER_TIMEOUT: ${DOCPIPE_RENDER_TIMEOUT:-30s}
+    #   DOCPIPE_MAX_BODY_BYTES: ${DOCPIPE_MAX_BODY_BYTES:-10485760}
+    #   DOCPIPE_RATE_LIMIT_RPS: ${DOCPIPE_RATE_LIMIT_RPS:-5}
+    #   DOCPIPE_RATE_LIMIT_BURST: ${DOCPIPE_RATE_LIMIT_BURST:-10}
+    #   DOCPIPE_BROWSER_RECYCLE_AFTER: ${DOCPIPE_BROWSER_RECYCLE_AFTER:-500}
+    #   DOCPIPE_BROWSER_HEALTHCHECK_INTERVAL: ${DOCPIPE_BROWSER_HEALTHCHECK_INTERVAL:-30s}
+    #   DOCPIPE_SNAPSHOT_INTERVAL: ${DOCPIPE_SNAPSHOT_INTERVAL:-1h}
+    #   DOCPIPE_DAILY_RETENTION_DAYS: ${DOCPIPE_DAILY_RETENTION_DAYS:-30}
+    #   DOCPIPE_STATS_PUBLIC: ${DOCPIPE_STATS_PUBLIC:-true}
+    #   DOCPIPE_ENABLE_SWAGGER: ${DOCPIPE_ENABLE_SWAGGER:-false}
 
     volumes:
       # Persists analytics state.json + daily/ rollups + auto-generated
