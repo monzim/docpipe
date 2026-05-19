@@ -75,6 +75,47 @@ paths:
                 value:
                   html_base64: "PCFkb2N0eXBlIGh0bWw+PGgxPmhpPC9oMT4="
                   filename: hi.pdf
+              all-options:
+                summary: Every customization option (paper, scale, margins, header/footer, page ranges, selector wait)
+                description: |
+                  Reference example exercising every supported field. The encoded HTML
+                  decodes to:
+
+                  ```html
+                  <!doctype html><html><head><style>body{font-family:sans-serif}</style></head>
+                  <body><h1>Report</h1><div id="ready">Render ready</div></body></html>
+                  ```
+
+                  Notes:
+                  - `display_header_footer` must be `true` for the templates to render.
+                  - Header/footer templates use Chrome's classes: `date`, `title`, `url`,
+                    `pageNumber`, `totalPages`. CSS in the template is inline only.
+                  - `wait.strategy: "selector"` requires `wait.selector`; the renderer
+                    waits for the element to become visible (or `timeout_ms` to elapse).
+                  - `page_ranges: "1-"` means "from page 1 to the end" — same syntax as
+                    Chrome's print dialog (e.g. `"1-3,5,8-"`).
+                value:
+                  html_base64: "PCFkb2N0eXBlIGh0bWw+PGh0bWw+PGhlYWQ+PHN0eWxlPmJvZHl7Zm9udC1mYW1pbHk6c2Fucy1zZXJpZn08L3N0eWxlPjwvaGVhZD48Ym9keT48aDE+UmVwb3J0PC9oMT48ZGl2IGlkPSJyZWFkeSI+UmVuZGVyIHJlYWR5PC9kaXY+PC9ib2R5PjwvaHRtbD4="
+                  filename: full-options-report.pdf
+                  options:
+                    format: A4
+                    landscape: false
+                    scale: 1.0
+                    print_background: true
+                    prefer_css_page_size: false
+                    margin:
+                      top: 18mm
+                      right: 12mm
+                      bottom: 18mm
+                      left: 12mm
+                    display_header_footer: true
+                    header_template: "<div style='font-size:8px;width:100%;text-align:center;color:#888'><span class='title'></span></div>"
+                    footer_template: "<div style='font-size:8px;width:100%;text-align:center;color:#888'>Page <span class='pageNumber'></span> of <span class='totalPages'></span></div>"
+                    page_ranges: "1-"
+                    wait:
+                      strategy: selector
+                      timeout_ms: 10000
+                      selector: "#ready"
       responses:
         '200':
           description: Successful render

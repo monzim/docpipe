@@ -17,12 +17,17 @@ import (
 // surface is dev-facing and gated by DOCPIPE_ENABLE_SWAGGER. The cost of
 // vendoring swagger-ui-dist (~1MB) into the binary isn't worth it for a
 // dev tool that's off by default in production.
+// The Flattop theme stylesheet from swagger-ui-themes is loaded AFTER the
+// base swagger-ui CSS so its overrides win the cascade. Pinning to v3.0.1
+// keeps the theme stable; the package targets Swagger UI 3.x but the class
+// names it restyles still exist in v5, which is what we ship.
 const swaggerHTML = `<!doctype html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <title>DocPipe — API</title>
   <link rel="stylesheet" href="https://unpkg.com/swagger-ui-dist@5/swagger-ui.css">
+  <link rel="stylesheet" href="https://unpkg.com/swagger-ui-themes@3.0.1/themes/3.x/theme-flattop.css">
   <style>body{margin:0}</style>
 </head>
 <body>
